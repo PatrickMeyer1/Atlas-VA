@@ -2,7 +2,7 @@ import time
 from pathlib import Path
 import matplotlib.pyplot as plt
 from matplotlib.patches import Circle, Rectangle
-from .constants import (
+from .garden_constants import (
     TILE_COLORS, TOOL_COLORS, PLANT_COLORS, 
     Color, TileType, ToolType, PlantType, 
     STATION_X, RESOURCE_TILE_Y, TOOL_TILE_Y

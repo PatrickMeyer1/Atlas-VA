@@ -6,7 +6,7 @@ from .training.model import JointIntentSlotModel
 
 # Calls our model and processes intents/slots
 class VoiceAssistantNLU:
-    def __init__(self, model_name="bert-base-uncased"):
+    def __init__(self, model_name="bert-base-uncased"): # We could pass device in since it's also used in answer generator
         self.device = torch.device("cuda" if torch.cuda.is_available() else ("mps" if torch.backends.mps.is_available() else "cpu"))
 
         base_dir = Path(__file__).parent

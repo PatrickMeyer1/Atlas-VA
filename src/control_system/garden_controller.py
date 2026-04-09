@@ -9,11 +9,12 @@ class GardenController:
         self.renderer = Renderer()
 
     def handle_voice_intent(self, intent_dict):
-        message, success, is_changed = self.engine.fulfill_intent(intent_dict)
+        fulfillment_result = self.engine.fulfill_intent(intent_dict)
 
         image_path = None
         # Only draw if necessary
-        if is_changed:
+        if fulfillment_result["is_changed"]:
             image_path = self.renderer.draw_garden(self.engine.game_state)
 
-        return {"tts_message": message, "success": success, "image_path": image_path}
+        fulfillment_result["image_path"] = image_path
+        return fulfillment_result

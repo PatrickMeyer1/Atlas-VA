@@ -1,5 +1,5 @@
 # Function to create the 2d grid array
-from .constants import TileType, RESOURCE_TILE_Y, TOOL_TILE_Y, STATION_X
+from .garden_constants import TileType, RESOURCE_TILE_Y, TOOL_TILE_Y, STATION_X
 
 def create_grid(width=12, height=6):
     grid = []
