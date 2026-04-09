@@ -1,13 +1,14 @@
-from nlu.intent_detection.inference import VoiceAssistantNLU
-from control_system.engine import GardenEngine
-from controller import Controller
+import random
+from src.nlu.intent_detection.inference import VoiceAssistantNLU
+from src.generation.answer_generator import AnswerGenerator
+from src.fulfillment.garden_actions import GardenFulfillment
 
-def manual_test():
+def integration_test():
     nlu = VoiceAssistantNLU()
-    # engine = GardenEngine()
-    coordinator = Controller()
+    fulfillment = GardenFulfillment()
+    generator = AnswerGenerator()
     
-    print("\n--- NLU Manual Test Mode ---")
+    print("\n--- NLU Integration Test Mode ---")
     print("Type a command (or 'exit' to stop):")
 
     while True:
@@ -15,19 +16,17 @@ def manual_test():
         if text.lower() in ['exit', 'quit']:
             break
             
-        result = nlu.process_utterance(text)
+        intent_result = nlu.process_utterance(text)
 
-        # message, success, image (for control system) or just message, success (for other intents)
-        message = coordinator.cleanup_and_dispatch(result)
+        raw_data = fulfillment.fulfill(intent_result)
 
-        print(f"Atlas > status: {message['success']}, message: {message['tts_message']}")
-        
-        print("\n--- Debug Info (Intent detection) ---")
-        print(f"Intent : {result['intent']}")
-        print(f"Slots  : {result['slots']}")
-        
-        if result.get('timer'):
-            print(f"Time   : {result['resolved_time']}")
+        use_llm = random.choice([True, False])
+        response = generator.generate_answer(raw_data, use_llm=use_llm)
+
+        print(f"Atlas > (Using { 'LLM' if use_llm else 'Template-based' }): {response}")
+
+        print(f"[DEBUG] Intent: {intent_result['intent']} | Slots: {intent_result.get('slots', {})}")
+        print(f"[DEBUG] Fulfillment Data: {raw_data}")
 
 if __name__ == "__main__":
-    manual_test()
+    integration_test()
