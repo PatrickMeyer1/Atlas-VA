@@ -1,0 +1,5 @@
+src/control_system/plots/*
+src/nlu/intent_detection/models/bert_finetuned/*
+**/__pycache__/
+.DS_Store
+.venv/*
