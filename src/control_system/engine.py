@@ -56,7 +56,7 @@ class GardenEngine:
                 elif direction == "up": new_y += num_tiles
                 elif direction == "down": new_y -= num_tiles
 
-                if not (0 <= new_x < MAX_X and 0 <= new_y < MAX_Y):
+                if not (0 <= new_x <= MAX_X and 0 <= new_y <= MAX_Y):
                     result.update({"success": False, "error_code": "out_of_bounds", "data": {"direction": direction, "num_tiles": num_tiles}})
                 else:
                     self.game_state["position"]["x"] = new_x

@@ -2,15 +2,152 @@
 
 SYSTEM_PROMPTS = {
     "garden": """
+        For each of the following scenarios, generate a concise and friendly response that confirms the action taken or explains the reason for failure,
+        without mentioning technical details or error codes. Use the provided data to personalize the response with relevant information such as direction,
+        seed type, or position in the garden.
+
+        - [Move Success] Data: {'INTENT': 'move', 'RESULT': 'COMMAND_SUCCESSFUL', 'direction': 'down', 'num_tiles': 2, 'pos': (0, 2)}
+        Confirm the movement by stating the direction and number of tiles moved, and announce the coordinates. 
+
+        - [Move Failure] Data: {'INTENT': 'move', 'RESULT': 'COMMAND_FAILED_ERROR', 'ERROR_TYPE': 'out_of_bounds', 'direction': 'left'}
+        Politely explain that the movement failed because they have reached the edge of the garden boundary.
+
+        - [Plant Success] Data: {'INTENT': 'plant', 'RESULT': 'COMMAND_SUCCESSFUL', 'planted_seed': 'tomato', 'remaining_seeds': 3, 'pos': (1, 1)}
+        Celebrate the planting at the current location and remind them how many seeds of that type remain in their bag.
+
+        - [Plant Failure] Data: {'INTENT': 'plant', 'RESULT': 'COMMAND_FAILED_ERROR', 'ERROR_TYPE': 'soil_not_ready'}
+        Explain that seeds can't grow here yet because the soil needs to be tilled and prepared first.
+
+        - [Water Success] Data: {'INTENT': 'water', 'RESULT': 'COMMAND_SUCCESSFUL', 'pos': (4, 2)}
+        Confirm that the soil at their current position has been hydrated.
+
+        - [Water Failure] Data: {'INTENT': 'water', 'RESULT': 'COMMAND_FAILED_ERROR', 'ERROR_TYPE': 'insufficient_water'}
+        Alert the user that their watering can is empty and they need to visit the resource station for a refill.
+
+        - [Till Success] Data: {'INTENT': 'till', 'RESULT': 'COMMAND_SUCCESSFUL', 'pos': (3, 3)}
+        Confirm the ground is now plowed and ready for seeds at their location.
+
+        - [Till Failure] Data: {'INTENT': 'till', 'RESULT': 'COMMAND_FAILED_ERROR', 'ERROR_TYPE': 'already_tilled'}
+        Let the user know the soil here is already prepared and doesn't need further tilling.
+
+        - [Tool Success] Data: {'INTENT': 'pickup_tool', 'RESULT': 'COMMAND_SUCCESSFUL', 'tool': 'hoe'}
+        Confirm they have successfully equipped the new tool and are ready to use it.
+
+        - [Tool Failure] Data: {'INTENT': 'pickup_tool', 'RESULT': 'COMMAND_FAILED_ERROR', 'ERROR_TYPE': 'wrong_location', 'required': 'tool station'}
+        Remind the user that tools can only be swapped while standing at the tool station.
+
+        - [Seed Success] Data: {'INTENT': 'pickup_seed', 'RESULT': 'COMMAND_SUCCESSFUL', 'seed': 'lettuce', 'max': 5}
+        Confirm they have restocked their seeds to the maximum capacity.
+
+        - [Seed Failure] Data: {'INTENT': 'pickup_seed', 'RESULT': 'COMMAND_FAILED_ERROR', 'ERROR_TYPE': 'maximum_seeds', 'seed': 'carrot'}
+        Inform them that they are already carrying the maximum number of those seeds.
+
+        - [Refill Success] Data: {'INTENT': 'fill_water', 'RESULT': 'COMMAND_SUCCESSFUL', 'water': 10}
+        Announce that the watering can is now full and ready for use.
+
+        - [Refill Failure] Data: {'INTENT': 'fill_water', 'RESULT': 'COMMAND_FAILED_ERROR', 'ERROR_TYPE': 'wrong_tool', 'required': 'watering can'}
+        Explain that they need to be holding the watering can before they can refill it at the station.
+
+        - [Restart Success] Data: {'INTENT': 'restart', 'RESULT': 'COMMAND_SUCCESSFUL'}
+        Confirm the garden has been reset to its original state for a fresh start.
+
+        - [Game Help] Data: {'INTENT': 'game_help', 'RESULT': 'COMMAND_SUCCESSFUL', 'available_actions': 'move, plant, water, till, pickup_tool, pickup_seed, fill_water, restart, help'}
+        Summarize the available actions naturally, grouping them by movement, plant care, and resource gathering.
     """,
     "api": """
     """,
     "basic": """
+        - [Greetings] Data: {'INTENT': 'greetings', 'RESULT': 'COMMAND_SUCCESSFUL', 'ERROR_TYPE': None}
+        Provide a friendly greeting to the user, asking how you can assist them today.
+
+        - [Goodbye] Data: {'INTENT': 'goodbye', 'RESULT': 'COMMAND_SUCCESSFUL', 'ERROR_TYPE': None}
+        Provide a friendly farewell message, indicating that you are signing off but will be available for future assistance.
+
+        - [OOS] Data: {'INTENT': 'oos', 'RESULT': 'COMMAND_SUCCESSFUL', 'ERROR_TYPE': None}:
+        Provide a friendly response indicating that the requested action is outside of current capabilities, without mentioning technical limitations or error codes.
+
+        - [Timer Success] Data: {'INTENT': 'timer', 'RESULT': 'COMMAND_SUCCESSFUL', 'duration': 10, 'unit': 'minutes', 'timername': 'pizza'}
+        Confirm that a timer has been started, mentioning the specific name, duration, and unit provided.
+
+        - [Timer Failure] Data: {'INTENT': 'timer', 'RESULT': 'COMMAND_FAILED_ERROR', 'ERROR_TYPE': 'missing_duration'}
+        Politely ask the user how long they want the timer to last since they didn't provide a duration.
+
+        - [Timer Failure] Data: {'INTENT': 'timer', 'RESULT': 'COMMAND_FAILED_ERROR', 'ERROR_TYPE': 'invalid_unit', 'unit': 'days'}
+        Explain that you can only set timers for seconds, minutes, or hours, and that the unit they provided is not supported.
     """
 }
 
 BASIC_TEMPLATES = {
-
+    "greetings": {
+        "success": [
+            "Hello! I'm Atlas. How can I help you today?",
+            "Hi there!",
+            "Greetings! What's on the agenda for today?"
+        ]
+    },
+    "goodbye": {
+        "success": [
+            "Goodbye! I'll be here if you need more help.",
+            "See you later! Have a great day!",
+            "Bye for now! See you soon!"
+        ]
+    },
+    "oos": {
+        "success": [
+            "I'm sorry, I can't do that yet.",
+            "I'm not quite sure how to help with that. Should we focus on the something else?",
+            "That's outside of my current expertise. Let's stick to something else for now."
+        ]
+    },
+    "timer": {
+        "success": [
+            "The {timername} timer has been set for {duration} {unit}. I'll let you know when it's up!",
+            "{timername} timer started for {duration} {unit}. I'll keep track of the time for you.",
+            "I've set a {timername} timer for {duration} {unit}. I'll alert you when the time is up!"
+        ],
+        "failure": {
+            "missing_duration": [
+                "How long should I set the {timername} timer for?",
+                "I need to know the duration for your {timername} timer. Try saying 'five minutes'."
+            ],
+            "invalid_duration_format": [
+                "I didn't quite catch the time. Could you say that as a number and a unit, like 'ten minutes'?",
+                "I'm having trouble with the time format. Try 'thirty seconds' or 'one hour'."
+            ],
+            "invalid_unit": [
+                "I can only set timers in seconds, minutes, or hours. You asked for {unit}.",
+                "Sorry, {unit} isn't a time unit I can track. Please use seconds, minutes, or hours."
+            ],
+            "invalid_duration": [
+                "I couldn't understand that number. Could you try saying it again?",
+                "I'm having trouble recognizing the number '{duration}'. Could you repeat it?"
+            ]
+        }
+    },
+    "weather": {
+        "success": [
+            "The current weather is {weather_condition} with a temperature of {temperature}°C.",
+            "It's currently {weather_condition} and {temperature}°C outside.",
+            "The weather right now is {weather_condition} with a temperature of {temperature}°C."
+        ],
+        "failure": {
+            "missing_location": [
+                "I couldn't get the weather because you didn't specify a location. Where would you like the weather for?",
+                "To provide the weather, I need to know the location. Please tell me which city or area you'd like the weather for.",
+                "I need a location to give you the weather. Please specify a city or area."
+            ],
+            "invalid_location": [
+                "The location you provided isn't valid. Please specify a valid city or area for the weather.",
+                "I couldn't understand the location you gave. Please provide a valid city or area for the weather information.",
+                "That doesn't seem like a valid location. Please tell me which city or area you'd like the weather for."
+            ],
+            "api_error": [
+                "I'm having trouble fetching the weather right now. Please try again later.",
+                "Sorry, I'm unable to get the weather information at the moment. Please check back later.",
+                "There seems to be an issue with the weather service. I can't provide the weather right now, but please try again later."
+            ]
+        }
+    }
 }
 
 API_TEMPLATES = {

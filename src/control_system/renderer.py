@@ -1,5 +1,7 @@
 import time
 from pathlib import Path
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from matplotlib.patches import Circle, Rectangle
 from .garden_constants import (

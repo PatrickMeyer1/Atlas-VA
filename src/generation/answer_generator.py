@@ -24,11 +24,11 @@ class AnswerGenerator:
         
         intent = raw_data.get("intent")
         if intent in BASIC_INTENTS:
-            return self._generate_basic_answer(raw_data)
+            return self._generate_template_answer(raw_data, BASIC_TEMPLATES)
         elif intent in API_INTENTS:
-            return self._generate_api_answer(raw_data)
+            return self._generate_template_answer(raw_data, API_TEMPLATES)
         elif intent in GARDEN_INTENTS:
-            return self._generate_garden_answer(raw_data)
+            return self._generate_template_answer(raw_data, GARDEN_TEMPLATES)
 
     def _generate_with_llm(self, raw_data):
         base_persona = (
@@ -58,7 +58,7 @@ class AnswerGenerator:
 
         messages = [
             {"role": "system", "content": system_prompt},
-            {"role": "user", "content": {str(display_data)}}
+            {"role": "user", "content": f"DATA: {display_data}\n\nATLAS RESPONSE:"}
         ]
 
         config = GenerationConfig(
@@ -74,25 +74,21 @@ class AnswerGenerator:
             generation_config=config
         )
 
-        return outputs[0]["generated_text"][-1]["content"].strip()
+        cleaned_output = outputs[0]["generated_text"][-1]["content"].strip().split("ATLAS RESPONSE:")[-1].strip().strip('"') # remove echo or quotes
 
-    def _generate_basic_answer(self, raw_data):
-        pass
+        return cleaned_output
 
-    def _generate_api_answer(self, raw_data):
-        pass
-
-    def _generate_garden_answer(self, raw_data):
+    def _generate_template_answer(self, raw_data,  templates_dict):
         intent = raw_data.get("intent")
         success = raw_data.get("success", False)
-        templates_for_intent = GARDEN_TEMPLATES.get(intent, ["Action completed successfully."])
+        templates_for_intent = templates_dict.get(intent, {})
 
         if success:
             templates = templates_for_intent.get("success")
         else: # Pick based on error code
             error_code = raw_data.get("error_code", "generic_error")
             failure_templates = templates_for_intent.get("failure", {})
-            templates = failure_templates.get(error_code, ["I encountered an issue in the garden."])
+            templates = failure_templates.get(error_code)
 
         template = random.choice(templates)
 

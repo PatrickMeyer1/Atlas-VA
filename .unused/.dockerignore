@@ -1,0 +1,10 @@
+# This ignores 'models' folders anywhere in the project tree
+**/models/
+
+# This ignores all files with model extensions anywhere
+**/*.pt
+**/*.bin
+
+# Also ensure your local environment is ignored globally
+**/.venv/
+**/__pycache__/
