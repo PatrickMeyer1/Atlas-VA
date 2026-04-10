@@ -128,6 +128,11 @@
     "I want a timer for twenty-five/B-DURATION minutes/I-DURATION"
   ],
   "weather": [
+    "what is the weather",
+    "what's the weather like",
+    "tell me the weather",
+    "check the weather",
+    "how is the weather today",
     "what's the weather in Ottawa/B-CITY",
     "tell me the weather for London/B-CITY UK/B-COUNTRY",
     "is it raining in Paris/B-CITY France/B-COUNTRY",

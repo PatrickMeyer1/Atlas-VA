@@ -31,7 +31,7 @@ def run_pipeline():
     model = JointIntentSlotModel(num_intents=len(intent2id), num_slots=len(slot2id)).to(device)
 
     print("\n3. Training Model")
-    model = train_model(model, train_loader, device, epochs=20)
+    model = train_model(model, train_loader, device, epochs=30)
 
     print("\n4. Evaluating Model")
     evaluate_intents(model, val_loader, id2intent, device)
