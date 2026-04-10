@@ -109,7 +109,7 @@ class GardenEngine:
                     result.update({"success": False, "error_code": "already_tilled"})
                 elif current_tile["type"] == TileType.GRASS:
                     current_tile["type"] = TileType.TILLED
-                    result.update({"is_changed": True,"success": True, "data": {"pos": (x_position, y_position)}})
+                    result.update({"is_changed": True, "success": True, "data": {"pos": (x_position, y_position)}})
 
             # Pick up or swap tool
             case "pickup_tool":
@@ -122,7 +122,7 @@ class GardenEngine:
                     result.update({"success": False, "error_code": "already_equipped", "data": {"tool": new_tool}})
                 else:
                     self.game_state["inventory"]["tool"] = tool_enum
-                    result.update({"is_changed": True,"success": True, "data": {"tool": new_tool}})
+                    result.update({"is_changed": True, "success": True, "data": {"tool": new_tool}})
 
             # Pick up a seed
             case "pickup_seed":
@@ -135,7 +135,7 @@ class GardenEngine:
                     result.update({"success": False, "error_code": "maximum_seeds", "data": {"seed": seed_enum.value, "max": MAX_PLANT}})
                 else:
                     seeds[seed_enum.value] = MAX_PLANT
-                    result.update({"is_changed": True,"success": True, "data": {"seed": seed_enum.value, "max": MAX_PLANT}})
+                    result.update({"is_changed": True, "success": True, "data": {"seed": seed_enum.value, "max": MAX_PLANT}})
 
             # Fill watering can at resource station
             case "fill_water":
@@ -147,6 +147,6 @@ class GardenEngine:
                     result.update({"success": False, "error_code": "maximum_water", "data": {"water": water, "max": MAX_WATER}})
                 else:
                     self.game_state["inventory"]["consumables"]["water"] = MAX_WATER
-                    result.update({"is_changed": True,"success": True, "data": {"water": MAX_WATER}})
+                    result.update({"is_changed": True, "success": True, "data": {"water": MAX_WATER}})
 
         return result

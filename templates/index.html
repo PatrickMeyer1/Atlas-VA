@@ -59,10 +59,20 @@
         </div>
 
         <div class="h-64 bg-gray-800 rounded-xl shadow-lg border border-gray-700 p-4 flex gap-4">
-            <div class="flex-1 bg-gray-700/50 rounded flex flex-col items-center justify-center border border-gray-600 p-2">
-                <h3 class="text-xs font-bold text-gray-500 mb-2 uppercase">Environment Status</h3>
-                <i data-feather="cloud" class="w-10 h-10"></i>
-                <span class="text-gray-400 text-sm mt-1">Open-Meteo API</span>
+            <div id="weather-box" class="flex-1 bg-gray-700/50 rounded flex flex-col items-center justify-evenly border border-gray-600 p-4 transition-all duration-700">
+                <h3 class="text-xs font-bold text-gray-500 uppercase tracking-[0.2em]">Environment Status</h3>
+                
+                <i id="weather-icon" data-feather="cloud" class="w-20 h-20 transition-colors duration-700"></i>
+                
+                <div class="text-center">
+                    <span id="weather-desc" class="block text-gray-100 text-2xl font-black uppercase leading-none">
+                        Open-Meteo API
+                    </span>
+                    
+                    <span id="weather-location" class="block text-gray-400 text-sm font-bold uppercase tracking-widest mt-2">
+                        Waiting for data
+                    </span>
+                </div>
             </div>
             
             <div id="timer-display" class="flex-1 bg-gray-700/50 rounded p-4 border border-gray-600 flex flex-col">
@@ -263,7 +273,7 @@
                 appendMessage('Atlas', data.response);
 
                 // 2. Update Image safely (checks if elements exist first)
-                if(data.image_updated || text.toLowerCase() === 'restart') {
+                if(data.image_updated) {
                     if (gameRender) {
                         gameRender.src = `/latest_image?t=${new Date().getTime()}`;
                         gameRender.classList.remove('hidden');
@@ -276,6 +286,36 @@
                 // 3. Update Timers safely (checks if state exists)
                 if (data.state && data.state.active_timers) {
                     updateTimers(data.state.active_timers);
+                }
+
+                if (data.intent === "weather" && data.success && data.data) {
+                    const weatherData = data.data;
+                    const iconElement = document.getElementById('weather-icon');
+                    const weatherBox = document.getElementById('weather-box');
+
+                    if (weatherBox && weatherData.theme) {
+                        const baseClasses = "flex-1 rounded flex flex-col items-center justify-evenly border p-4 transition-all duration-700";
+                        weatherBox.className = `${baseClasses} ${weatherData.theme}`;
+                    }
+
+                    if (iconElement && weatherData.icon && weatherData.theme) {
+                        const colorMatch = weatherData.theme.match(/text-\w+-\d+/);
+                        iconElement.setAttribute('data-feather', weatherData.icon);
+                        if (colorMatch) iconElement.className = `w-20 h-20 ${colorMatch[0]}`;
+                        iconElement.setAttribute('data-feather', weatherData.icon);
+                    }
+
+                    const descElement = document.getElementById('weather-desc');
+                    if (descElement) {
+                        descElement.innerText = `${weatherData.weather_condition} | ${weatherData.temperature}${weatherData.temperature_unit}`;
+                    }
+
+                    const locElement = document.getElementById('weather-location');
+                    if (locElement) {
+                        locElement.innerText = `${weatherData.city}, ${weatherData.country}`;
+                    }
+
+                    renderFeatherIcons();
                 }
 
             } catch (error) {
