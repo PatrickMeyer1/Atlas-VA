@@ -6,34 +6,9 @@ from src.nlu.intent_detection.inference import VoiceAssistantNLU
 from src.generation.answer_generator import AnswerGenerator
 from src.fulfillment.dispatcher import FulfillmentDispatcher
 from src.user_auth import verification
+from config import load_env_file
 
-
-def _load_env_file() -> None:
-    """Load KEY=VALUE pairs from a local .env file (demo convenience).
-
-    This avoids requiring `huggingface-cli login` by letting you set HF_TOKEN in `.env`.
-    """
-
-    env_path = Path(__file__).with_name(".env")
-    if not env_path.exists():
-        return
-
-    for raw_line in env_path.read_text(encoding="utf-8").splitlines():
-        line = raw_line.strip()
-        if not line or line.startswith("#"):
-            continue
-        if line.startswith("export "):
-            line = line[len("export "):].strip()
-        if "=" not in line:
-            continue
-        key, value = line.split("=", 1)
-        key = key.strip()
-        value = value.strip().strip('"').strip("'")
-        if key and key not in os.environ:
-            os.environ[key] = value
-
-
-_load_env_file()
+load_env_file()
 
 app = Flask(__name__)
 
@@ -41,13 +16,6 @@ app = Flask(__name__)
 nlu = VoiceAssistantNLU()
 dispatcher = FulfillmentDispatcher()
 generator = AnswerGenerator()
-
-
-def _get_nlu() -> VoiceAssistantNLU:
-    global nlu
-    if nlu is None:
-        nlu = VoiceAssistantNLU()
-    return nlu
 
 # global state for UI
 ui_state = {
@@ -81,10 +49,11 @@ def chat():
     return jsonify({
         "response": response_text,
         "intent": intent_result.get("intent"),
+        "success": fulfillment_result.get("success"),
+        "data": fulfillment_result.get("data"),
         "state": ui_state,
         "image_updated": fulfillment_result.get("is_changed", False)
     })
-
 
 @app.route('/verification/audiostream', methods=['POST'])
 def verification_audio():

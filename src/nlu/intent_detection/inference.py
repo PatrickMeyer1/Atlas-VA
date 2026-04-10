@@ -1,6 +1,8 @@
+import re
 import torch
 from pathlib import Path
 from transformers import AutoTokenizer
+from num2words import num2words
 
 from .training.model import JointIntentSlotModel
 
@@ -29,8 +31,14 @@ class VoiceAssistantNLU:
         self.model.eval()
 
     def process_utterance(self, text):
+        text = re.sub(r'\d+', lambda m: num2words(int(m.group())), text)
+
+        text = re.sub(r'([?!.,])', r' \1 ', text) # add spaces (so each punctuation is its own token)
+
+        words = text.strip().split()
+
         encodings = self.tokenizer(
-            text.split(),
+            words,
             is_split_into_words=True,
             padding=True,
             truncation=True,

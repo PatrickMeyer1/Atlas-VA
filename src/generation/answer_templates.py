@@ -74,6 +74,18 @@ SYSTEM_PROMPTS = {
 
         - [Timer Failure] Data: {'INTENT': 'timer', 'RESULT': 'COMMAND_FAILED_ERROR', 'ERROR_TYPE': 'invalid_unit', 'unit': 'days'}
         Explain that you can only set timers for seconds, minutes, or hours, and that the unit they provided is not supported.
+
+        - [Weather Success] Data: {'INTENT': 'weather', 'RESULT': 'COMMAND_SUCCESSFUL', 'city': 'Ottawa', 'country': 'Canada', 'weather_condition': 'clear sky', 'temperature': 22, 'temperature_unit': '°C', 'feels_like': 21, 'apparent_temperature_unit': '°C', 'humidity': 45, 'relative_humidity_unit': '%', 'wind_speed': 10, 'wind_speed_unit': 'km/h'}
+        Confirm the current weather conditions for the specified city. Naturally include the temperature, how it feels, and relevant details like humidity or wind speed using their respective units.
+
+        - [Weather Failure] Data: {'INTENT': 'weather', 'RESULT': 'COMMAND_FAILED_ERROR', 'ERROR_TYPE': 'missing_location'}
+        Politely inform the user that you need a city name to look up the weather, as no location was provided in their request.
+
+        - [Weather Failure] Data: {'INTENT': 'weather', 'RESULT': 'COMMAND_FAILED_ERROR', 'ERROR_TYPE': 'invalid_location', 'location': 'Atlantis'}
+        Explain that you couldn't find any geographical data for the city provided and ask the user to double-check the name or try a different location.
+
+        - [Weather Failure] Data: {'INTENT': 'weather', 'RESULT': 'COMMAND_FAILED_ERROR', 'ERROR_TYPE': 'api_error'}
+        Apologize and let the user know that there is currently a problem connecting to the weather service, and suggest they try again in a few moments.
     """
 }
 
@@ -126,25 +138,22 @@ BASIC_TEMPLATES = {
     },
     "weather": {
         "success": [
-            "The current weather is {weather_condition} with a temperature of {temperature}°C.",
-            "It's currently {weather_condition} and {temperature}°C outside.",
-            "The weather right now is {weather_condition} with a temperature of {temperature}°C."
+            "In {city}, {country} it's currently {weather_condition} at {temperature}{temperature_unit}. It feels like {feels_like}{apparent_temperature_unit} with {humidity}{relative_humidity_unit} humidity.",
+            "The weather in {city}, {country} is {weather_condition}. The temperature is {temperature}{temperature_unit}, though it feels closer to {feels_like}{apparent_temperature_unit} due to the wind.",
+            "Right now in {city}, {country} you'll find {weather_condition} conditions. It's {temperature}{temperature_unit} with a wind speed of {wind_speed} {wind_speed_unit}.",
+            "It is {weather_condition} in {city}, {country}. The temperature is {temperature}{temperature_unit} with {precipitation} {precipitation_unit} of precipitation recorded.",
+            "Currently in {city}, {country} it's {temperature}{temperature_unit} and {weather_condition}. With {humidity}{relative_humidity_unit} humidity, it feels like {feels_like}{apparent_temperature_unit} outside."
         ],
         "failure": {
-            "missing_location": [
-                "I couldn't get the weather because you didn't specify a location. Where would you like the weather for?",
-                "To provide the weather, I need to know the location. Please tell me which city or area you'd like the weather for.",
-                "I need a location to give you the weather. Please specify a city or area."
-            ],
             "invalid_location": [
                 "The location you provided isn't valid. Please specify a valid city or area for the weather.",
                 "I couldn't understand the location you gave. Please provide a valid city or area for the weather information.",
                 "That doesn't seem like a valid location. Please tell me which city or area you'd like the weather for."
             ],
             "api_error": [
-                "I'm having trouble fetching the weather right now. Please try again later.",
-                "Sorry, I'm unable to get the weather information at the moment. Please check back later.",
-                "There seems to be an issue with the weather service. I can't provide the weather right now, but please try again later."
+                "I'm having trouble fetching the weather right now for {city}, {country}. Please try again later.",
+                "Sorry, I'm unable to get the weather information for {city}, {country} at the moment. Please check back later.",
+                "There seems to be an issue with the weather service. I can't provide the weather for {city}, {country} right now, but please try again later."
             ]
         }
     }
