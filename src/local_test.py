@@ -1,11 +1,11 @@
 import random
 from src.nlu.intent_detection.inference import VoiceAssistantNLU
 from src.generation.answer_generator import AnswerGenerator
-from src.fulfillment.garden_actions import GardenFulfillment
+from src.fulfillment.dispatcher import FulfillmentDispatcher
 
-def integration_test():
+def test():
     nlu = VoiceAssistantNLU()
-    fulfillment = GardenFulfillment()
+    fulfillment = FulfillmentDispatcher()
     generator = AnswerGenerator()
     
     print("\n--- NLU Integration Test Mode ---")
@@ -18,7 +18,7 @@ def integration_test():
             
         intent_result = nlu.process_utterance(text)
 
-        raw_data = fulfillment.fulfill(intent_result)
+        raw_data = fulfillment.dispatch(intent_result)
 
         use_llm = random.choice([True, False])
         response = generator.generate_answer(raw_data, use_llm=use_llm)
@@ -29,4 +29,4 @@ def integration_test():
         print(f"[DEBUG] Fulfillment Data: {raw_data}")
 
 if __name__ == "__main__":
-    integration_test()
+    test()

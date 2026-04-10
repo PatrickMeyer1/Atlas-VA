@@ -63,4 +63,4 @@ class GardenFulfillment:
                     "slots": {"tool": tool.lower()}
                 })
             case _:
-                return {"intent": intent, "success": False, "error_code": "invalid_intent", "data": {"provided": intent}}
+                return {"intent": intent, "success": False, "error_code": "invalid_intent"}

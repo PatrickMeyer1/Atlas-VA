@@ -1,9 +1,6 @@
 import torch
 from torch.optim import AdamW
 
-from dataset import prepare_datasets
-from model import JointIntentSlotModel
-
 def train_model(model, train_loader, device, epochs=20, learning_rate=2e-5):
     print(f"Starting Training for {epochs} Epochs")
     optimizer = AdamW(model.parameters(), lr=learning_rate)
