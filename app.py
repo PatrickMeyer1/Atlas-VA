@@ -1,16 +1,53 @@
 from flask import Flask, render_template, request, jsonify, send_file
 import os
 import glob
+from pathlib import Path
 from src.nlu.intent_detection.inference import VoiceAssistantNLU
 from src.generation.answer_generator import AnswerGenerator
 from src.fulfillment.dispatcher import FulfillmentDispatcher
+from src.user_auth import verification
+
+
+def _load_env_file() -> None:
+    """Load KEY=VALUE pairs from a local .env file (demo convenience).
+
+    This avoids requiring `huggingface-cli login` by letting you set HF_TOKEN in `.env`.
+    """
+
+    env_path = Path(__file__).with_name(".env")
+    if not env_path.exists():
+        return
+
+    for raw_line in env_path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+        if line.startswith("export "):
+            line = line[len("export "):].strip()
+        if "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        key = key.strip()
+        value = value.strip().strip('"').strip("'")
+        if key and key not in os.environ:
+            os.environ[key] = value
+
+
+_load_env_file()
 
 app = Flask(__name__)
 
 # Components
-nlu = VoiceAssistantNLU()
+nlu = None
 dispatcher = FulfillmentDispatcher()
 generator = AnswerGenerator()
+
+
+def _get_nlu() -> VoiceAssistantNLU:
+    global nlu
+    if nlu is None:
+        nlu = VoiceAssistantNLU()
+    return nlu
 
 # global state for UI
 ui_state = {
@@ -47,6 +84,25 @@ def chat():
         "state": ui_state,
         "image_updated": fulfillment_result.get("is_changed", False)
     })
+
+
+@app.route('/verification/audiostream', methods=['POST'])
+def verification_audio():
+    audio_file = request.files.get('audio')
+
+    if audio_file is None:
+        return jsonify({"error": "Missing audio file"}), 400
+
+    chunk_bytes = audio_file.read() or b""
+    if not chunk_bytes:
+        return jsonify({"error": "Empty audio chunk"}), 400
+
+    stats = verification.ingest_audio_chunk(
+        chunk_bytes=chunk_bytes,
+        mimetype=audio_file.mimetype,
+    )
+    
+    return jsonify({"ok": True, "verification": stats})
 
 # Fetch last image generated
 @app.route('/latest_image')

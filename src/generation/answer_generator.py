@@ -1,4 +1,5 @@
 import random
+import os
 from transformers import GenerationConfig, pipeline
 import torch
 from collections import defaultdict
@@ -8,7 +9,23 @@ from src.generation.answer_templates import BASIC_TEMPLATES, API_TEMPLATES, GARD
 
 class AnswerGenerator:
     def __init__(self, model_name="meta-llama/Llama-3.2-1B-Instruct"): # We could pass device in since it's also used in inference.py or pass the model from the main pipeline
-        self.model = pipeline("text-generation", model=model_name, dtype="auto", device_map=torch.device("cuda" if torch.cuda.is_available() else ("mps" if torch.backends.mps.is_available() else "cpu")))
+        self.model_name = model_name
+        self.model = None
+
+    def _ensure_llm_loaded(self):
+        if self.model is not None:
+            return
+
+        token = os.getenv("HF_TOKEN") or os.getenv("HUGGINGFACEHUB_API_TOKEN")
+
+        # Lazy-load so app startup doesn't require Hugging Face auth.
+        self.model = pipeline(
+            "text-generation",
+            model=self.model_name,
+            dtype="auto",
+            device_map="auto",
+            token=token,
+        )
 
     def format_response(self, items):
         if not items:
@@ -31,6 +48,8 @@ class AnswerGenerator:
             return self._generate_template_answer(raw_data, GARDEN_TEMPLATES)
 
     def _generate_with_llm(self, raw_data):
+        self._ensure_llm_loaded()
+
         base_persona = (
             "You are Atlas, a friendly and concise voice assistant. "
             "Use the 'Fulfillment Data' to give a short update in 1-2 sentences. "

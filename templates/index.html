@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Atlas VA Interface</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/feather-icons"></script>
     <style>
         /* Custom scrollbar for chat */
         ::-webkit-scrollbar { width: 8px; }
@@ -48,17 +49,19 @@
         
         <div class="flex gap-4 h-16">
             <div id="lock-status" class="flex-1 rounded-xl flex items-center justify-center font-bold text-lg shadow-md bg-red-600 text-white transition-colors duration-300">
-                🔒 System Locked
+                <i data-feather="lock" class="w-5 h-5 mr-2"></i>
+                <span>System Locked</span>
             </div>
-            <div id="listen-status" class="flex-1 rounded-xl flex items-center justify-center font-bold text-lg shadow-md bg-yellow-500 text-gray-900 transition-colors duration-300 cursor-pointer hover:opacity-90" onclick="toggleListening()">
-                🎙️ Not Listening
+            <div id="listen-status" class="flex-1 rounded-xl flex items-center justify-center font-bold text-lg shadow-md bg-yellow-500 text-gray-900 transition-colors duration-300 cursor-pointer hover:opacity-90" onclick="toggleMicStreaming()">
+                <i data-feather="mic-off" class="w-5 h-5 mr-2"></i>
+                <span>Not Listening</span>
             </div>
         </div>
 
         <div class="h-64 bg-gray-800 rounded-xl shadow-lg border border-gray-700 p-4 flex gap-4">
             <div class="flex-1 bg-gray-700/50 rounded flex flex-col items-center justify-center border border-gray-600 p-2">
                 <h3 class="text-xs font-bold text-gray-500 mb-2 uppercase">Environment Status</h3>
-                <div class="text-3xl">⛅</div>
+                <i data-feather="cloud" class="w-10 h-10"></i>
                 <span class="text-gray-400 text-sm mt-1">Open-Meteo API</span>
             </div>
             
@@ -86,26 +89,144 @@
         const userInput = document.getElementById('user-input');
         const gameRender = document.getElementById('game-render');
         const noRenderText = document.getElementById('no-render-text');
+        const listenStatusDiv = document.getElementById('listen-status');
         
-        let isListening = false;
         let activeTimers = [];
+
+        let isMicStreaming = false;
+        let micMediaStream = null;
+        let micRecorder = null;
+        let micUploadChain = Promise.resolve();
 
         // Allow Enter key to send
         userInput.addEventListener("keypress", function(event) {
             if (event.key === "Enter") sendMessage();
         });
 
-        function toggleListening() {
-            isListening = !isListening;
-            const listenDiv = document.getElementById('listen-status');
-            if(isListening) {
-                listenDiv.className = "flex-1 rounded-xl flex items-center justify-center font-bold text-lg shadow-md bg-green-500 text-white transition-colors duration-300 cursor-pointer";
-                listenDiv.innerHTML = "🎙️ LISTENING...";
-            } else {
-                listenDiv.className = "flex-1 rounded-xl flex items-center justify-center font-bold text-lg shadow-md bg-yellow-500 text-gray-900 transition-colors duration-300 cursor-pointer";
-                listenDiv.innerHTML = "🎙️ NOT LISTENING";
+        function renderFeatherIcons() {
+            if (window.feather && typeof window.feather.replace === 'function') {
+                window.feather.replace();
             }
-        } 
+        }
+
+        function setListeningState(streaming) {
+            if (!listenStatusDiv) return;
+
+            if (streaming) {
+                listenStatusDiv.className = "flex-1 rounded-xl flex items-center justify-center font-bold text-lg shadow-md bg-green-500 text-white transition-colors duration-300 cursor-pointer hover:opacity-90";
+                listenStatusDiv.innerHTML = '<i data-feather="mic" class="w-5 h-5 mr-2"></i><span>Listening...</span>';
+            } else {
+                listenStatusDiv.className = "flex-1 rounded-xl flex items-center justify-center font-bold text-lg shadow-md bg-yellow-500 text-gray-900 transition-colors duration-300 cursor-pointer hover:opacity-90";
+                listenStatusDiv.innerHTML = '<i data-feather="mic-off" class="w-5 h-5 mr-2"></i><span>Not Listening</span>';
+            }
+
+            renderFeatherIcons();
+        }
+
+        async function uploadAudioChunk(blob) {
+            if (!blob || blob.size === 0) return;
+
+            const form = new FormData();
+            form.append('audio', blob, 'chunk.webm');
+
+            const response = await fetch('/verification/audiostream', {
+                method: 'POST',
+                body: form
+            });
+
+            if (!response.ok) {
+                let errorText = `HTTP ${response.status} from server`;
+                try {
+                    const data = await response.json();
+                    if (data && data.error) errorText = data.error;
+                } catch (_) {}
+                throw new Error(errorText);
+            }
+
+            return response.json();
+        }
+
+        function queueAudioUpload(blob) {
+            micUploadChain = micUploadChain
+                .then(() => uploadAudioChunk(blob))
+                .catch((err) => {
+                    console.error('Mic upload error:', err);
+                });
+        }
+
+        async function startMicStreaming() {
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                appendMessage('System', 'Error: Microphone is not supported in this browser.');
+                return;
+            }
+            if (!window.MediaRecorder) {
+                appendMessage('System', 'Error: MediaRecorder is not supported in this browser.');
+                return;
+            }
+
+            micMediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+            const preferredMimeTypes = [
+                'audio/webm;codecs=opus',
+                'audio/webm'
+            ];
+            const selectedMimeType = preferredMimeTypes.find(t => MediaRecorder.isTypeSupported(t));
+            micRecorder = selectedMimeType ? new MediaRecorder(micMediaStream, { mimeType: selectedMimeType }) : new MediaRecorder(micMediaStream);
+
+            micRecorder.ondataavailable = (event) => {
+                if (!event.data) return;
+                queueAudioUpload(event.data);
+            };
+
+            micRecorder.onerror = (event) => {
+                console.error('Mic recorder error:', event);
+            };
+
+            micRecorder.onstop = () => {
+                if (micMediaStream) {
+                    micMediaStream.getTracks().forEach(t => t.stop());
+                }
+                micMediaStream = null;
+                micRecorder = null;
+            };
+
+            isMicStreaming = true;
+            setListeningState(true);
+
+            // Start recording and emit chunks periodically (live feed)
+            micRecorder.start(1000);
+        }
+
+        function stopMicStreaming() {
+            isMicStreaming = false;
+            setListeningState(false);
+
+            try {
+                if (micRecorder && micRecorder.state !== 'inactive') {
+                    micRecorder.stop();
+                }
+            } catch (err) {
+                console.error('Failed to stop mic recorder:', err);
+            }
+
+            if (micMediaStream) {
+                micMediaStream.getTracks().forEach(t => t.stop());
+                micMediaStream = null;
+            }
+        }
+
+        async function toggleMicStreaming() {
+            try {
+                if (isMicStreaming) {
+                    stopMicStreaming();
+                } else {
+                    await startMicStreaming();
+                }
+            } catch (err) {
+                appendMessage('System', `Error: ${err.message}`);
+                stopMicStreaming();
+            }
+        }
 
         function appendMessage(sender, text) {
             const div = document.createElement('div');
@@ -197,6 +318,9 @@
             }).join('');
         }
         setInterval(renderTimerUI, 1000);
+
+        renderFeatherIcons();
+        setListeningState(false);
     </script>
 </body>
 </html>

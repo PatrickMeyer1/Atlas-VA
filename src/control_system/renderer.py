@@ -97,6 +97,7 @@ class Renderer:
 
         base_dir = Path(__file__).parent
         plot_dir = base_dir / "plots"
+        plot_dir.mkdir(parents=True, exist_ok=True) # had trouble running without the folder existing
 
         # Saves new plot
         filename = plot_dir / f"output_plot_{int(time.time() * 1000)}.png"
