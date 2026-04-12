@@ -1,58 +1,30 @@
-from flask import Flask, render_template, request, jsonify, send_file
+from flask import Flask, Response, jsonify, render_template, request, send_file, stream_with_context
 import os
 import glob
 from pathlib import Path
 from src.nlu.intent_detection.inference import VoiceAssistantNLU
 from src.generation.answer_generator import AnswerGenerator
 from src.fulfillment.dispatcher import FulfillmentDispatcher
-from src.user_auth import verification
+from src.user_auth import asr
+from config import load_env_file
 
-
-def _load_env_file() -> None:
-    """Load KEY=VALUE pairs from a local .env file (demo convenience).
-
-    This avoids requiring `huggingface-cli login` by letting you set HF_TOKEN in `.env`.
-    """
-
-    env_path = Path(__file__).with_name(".env")
-    if not env_path.exists():
-        return
-
-    for raw_line in env_path.read_text(encoding="utf-8").splitlines():
-        line = raw_line.strip()
-        if not line or line.startswith("#"):
-            continue
-        if line.startswith("export "):
-            line = line[len("export "):].strip()
-        if "=" not in line:
-            continue
-        key, value = line.split("=", 1)
-        key = key.strip()
-        value = value.strip().strip('"').strip("'")
-        if key and key not in os.environ:
-            os.environ[key] = value
-
-
-_load_env_file()
+load_env_file()
 
 app = Flask(__name__)
+
+app.debug = True
 
 # Components
 nlu = VoiceAssistantNLU()
 dispatcher = FulfillmentDispatcher()
 generator = AnswerGenerator()
-
-
-def _get_nlu() -> VoiceAssistantNLU:
-    global nlu
-    if nlu is None:
-        nlu = VoiceAssistantNLU()
-    return nlu
+asr.ensure_asr_ready()
 
 # global state for UI
 ui_state = {
     "is_locked": True,
     "is_listening": False,
+    "tts_enabled": True,
     "active_timers": []
 }
 
@@ -63,8 +35,12 @@ def index():
 # Receive audio data and return a response (now just text) TO CHANGE TO AUDIO
 @app.route('/chat', methods=['POST'])
 def chat():
-    user_text = request.json.get('text', '')
-    use_llm = request.json.get('use_llm', False)
+    req_payload = request.get_json(silent=True) or {}
+    user_text = req_payload.get('text', '')
+    use_llm = req_payload.get('use_llm', False)
+
+    if "tts_enabled" in req_payload:
+        ui_state["tts_enabled"] = bool(req_payload.get("tts_enabled"))
 
     # NLU
     intent_result = nlu.process_utterance(user_text)
@@ -75,20 +51,67 @@ def chat():
     # Generation
     response_text = generator.generate_answer(fulfillment_result, use_llm=use_llm)
 
+    tts = None
+    if ui_state.get("tts_enabled"):
+        tts = generator.text_to_speech(response_text, intent=fulfillment_result.get("intent"))
+
     if fulfillment_result.get("intent") == "timer" and fulfillment_result.get("success"):
         ui_state["active_timers"].append(fulfillment_result["data"])
 
     return jsonify({
         "response": response_text,
+        "tts": tts,
         "intent": intent_result.get("intent"),
+        "success": fulfillment_result.get("success"),
+        "data": fulfillment_result.get("data"),
         "state": ui_state,
         "image_updated": fulfillment_result.get("is_changed", False)
     })
 
 
+@app.route('/tts/audio', methods=['GET'])
+def tts_audio():
+    text = request.args.get('text', '')
+    intent = request.args.get('intent')
+
+    if not text or not str(text).strip():
+        return jsonify({"error": "Missing text"}), 400
+
+    if not generator.server_tts_available():
+        return jsonify({"error": "Server-side TTS requires the edge-tts package."}), 503
+
+    tts_payload = generator.text_to_speech(text, intent=intent)
+
+    for field in ("voice", "rate", "pitch", "volume"):
+        value = request.args.get(field)
+        if value:
+            tts_payload[field] = value
+
+    return Response(
+        stream_with_context(generator.stream_text_to_speech(tts_payload)),
+        mimetype='audio/mpeg',
+        headers={
+            "Cache-Control": "no-store",
+            "Content-Disposition": 'inline; filename="atlas-response.mp3"',
+        },
+    )
+
+
+@app.route('/asr/audiostream', methods=['POST'])
 @app.route('/verification/audiostream', methods=['POST'])
-def verification_audio():
+def microphone_audio():
     audio_file = request.files.get('audio')
+    session_id = (request.form.get('session_id') or 'default').strip() or 'default'
+    finalize = str(request.form.get('finalize', '')).strip().lower() in {"1", "true", "yes"}
+    chunk_index_raw = request.form.get('chunk_index')
+    chunk_started_at_ms_raw = request.form.get('chunk_started_at_ms')
+
+    chunk_index = int(chunk_index_raw) if chunk_index_raw not in (None, "") else None
+    chunk_started_at_ms = float(chunk_started_at_ms_raw) if chunk_started_at_ms_raw not in (None, "") else None
+
+    if finalize and audio_file is None:
+        transcript = asr.finalize_session(session_id=session_id)
+        return jsonify({"ok": True, "transcript": transcript})
 
     if audio_file is None:
         return jsonify({"error": "Missing audio file"}), 400
@@ -97,12 +120,15 @@ def verification_audio():
     if not chunk_bytes:
         return jsonify({"error": "Empty audio chunk"}), 400
 
-    stats = verification.ingest_audio_chunk(
+    transcript = asr.ingest_audio_chunk(
         chunk_bytes=chunk_bytes,
         mimetype=audio_file.mimetype,
+        session_id=session_id,
+        chunk_index=chunk_index,
+        chunk_started_at_ms=chunk_started_at_ms,
     )
-    
-    return jsonify({"ok": True, "verification": stats})
+
+    return jsonify({"ok": True, "transcript": transcript})
 
 # Fetch last image generated
 @app.route('/latest_image')

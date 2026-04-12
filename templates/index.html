@@ -16,8 +16,12 @@
 <body class="bg-gray-900 text-gray-100 h-screen w-screen p-4 flex gap-4 overflow-hidden font-sans">
 
     <div class="w-1/3 bg-gray-800 rounded-xl shadow-lg border border-gray-700 flex flex-col">
-        <div class="p-4 border-b border-gray-700 bg-gray-800 rounded-t-xl">
+        <div class="p-4 border-b border-gray-700 bg-gray-800 rounded-t-xl flex items-center justify-between">
             <h2 class="text-xl font-bold text-blue-400">Atlas Communication</h2>
+
+            <button type="button" id="tts-toggle-btn" onclick="toggleTts()" class="text-blue-400 hover:text-blue-300 rounded p-1 focus:outline-none focus:ring-2 focus:ring-blue-500" title="Toggle speech" aria-label="Toggle speech">
+                <i data-feather="volume-2" class="w-5 h-5"></i>
+            </button>
         </div>
         
         <div id="chat-history" class="flex-1 overflow-y-auto p-4 space-y-4">
@@ -59,10 +63,20 @@
         </div>
 
         <div class="h-64 bg-gray-800 rounded-xl shadow-lg border border-gray-700 p-4 flex gap-4">
-            <div class="flex-1 bg-gray-700/50 rounded flex flex-col items-center justify-center border border-gray-600 p-2">
-                <h3 class="text-xs font-bold text-gray-500 mb-2 uppercase">Environment Status</h3>
-                <i data-feather="cloud" class="w-10 h-10"></i>
-                <span class="text-gray-400 text-sm mt-1">Open-Meteo API</span>
+            <div id="weather-box" class="flex-1 bg-gray-700/50 rounded flex flex-col items-center justify-evenly border border-gray-600 p-4 transition-all duration-700">
+                <h3 class="text-xs font-bold text-gray-500 uppercase tracking-[0.2em]">Environment Status</h3>
+                
+                <i id="weather-icon" data-feather="cloud" class="w-20 h-20 transition-colors duration-700"></i>
+                
+                <div class="text-center">
+                    <span id="weather-desc" class="block text-gray-100 text-2xl font-black uppercase leading-none">
+                        Open-Meteo API
+                    </span>
+                    
+                    <span id="weather-location" class="block text-gray-400 text-sm font-bold uppercase tracking-widest mt-2">
+                        Waiting for data
+                    </span>
+                </div>
             </div>
             
             <div id="timer-display" class="flex-1 bg-gray-700/50 rounded p-4 border border-gray-600 flex flex-col">
@@ -90,13 +104,25 @@
         const gameRender = document.getElementById('game-render');
         const noRenderText = document.getElementById('no-render-text');
         const listenStatusDiv = document.getElementById('listen-status');
+        const ttsToggleBtn = document.getElementById('tts-toggle-btn');
         
         let activeTimers = [];
+
+        let ttsEnabled = true;
 
         let isMicStreaming = false;
         let micMediaStream = null;
         let micRecorder = null;
         let micUploadChain = Promise.resolve();
+        let currentTtsAudio = null;
+        let asrSessionId = null;
+        let asrChunkIndex = 0;
+        let asrSessionStartedAt = 0;
+        let lastAppliedAsrIndex = -1;
+        let pendingAsrFinalizeSessionId = null;
+        let micRecorderMimeType = null;
+        let micRecorderRestartTimer = null;
+        const MIC_CHUNK_MS = 3000;
 
         // Allow Enter key to send
         userInput.addEventListener("keypress", function(event) {
@@ -107,6 +133,23 @@
             if (window.feather && typeof window.feather.replace === 'function') {
                 window.feather.replace();
             }
+        }
+
+        function createAsrSessionId() {
+            return (window.crypto && typeof window.crypto.randomUUID === 'function')
+                ? window.crypto.randomUUID()
+                : `asr-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+        }
+
+        function writeUserInputFromAsr(text) {
+            userInput.value = text;
+        }
+
+        function startFreshAsrSession() {
+            asrSessionId = createAsrSessionId();
+            asrChunkIndex = 0;
+            asrSessionStartedAt = performance.now();
+            lastAppliedAsrIndex = -1;
         }
 
         function setListeningState(streaming) {
@@ -123,13 +166,149 @@
             renderFeatherIcons();
         }
 
-        async function uploadAudioChunk(blob) {
+        function setTtsButtonState(enabled) {
+            if (!ttsToggleBtn) return;
+
+            if (enabled) {
+                ttsToggleBtn.className = "text-blue-400 hover:text-blue-300 rounded p-1 focus:outline-none focus:ring-2 focus:ring-blue-500";
+                ttsToggleBtn.innerHTML = '<i data-feather="volume-2" class="w-5 h-5"></i>';
+                ttsToggleBtn.title = "Turn speech off";
+                ttsToggleBtn.setAttribute('aria-label', 'Turn speech off');
+            } else {
+                ttsToggleBtn.className = "text-gray-500 hover:text-gray-400 rounded p-1 focus:outline-none focus:ring-2 focus:ring-blue-500";
+                ttsToggleBtn.innerHTML = '<i data-feather="volume-x" class="w-5 h-5"></i>';
+                ttsToggleBtn.title = "Turn speech on";
+                ttsToggleBtn.setAttribute('aria-label', 'Turn speech on');
+            }
+
+            renderFeatherIcons();
+        }
+
+        function toggleTts() {
+            ttsEnabled = !ttsEnabled;
+            setTtsButtonState(ttsEnabled);
+            if (!ttsEnabled) stopTtsPlayback();
+        }
+
+        function stopTtsPlayback() {
+            if (currentTtsAudio) {
+                try {
+                    currentTtsAudio.pause();
+                    currentTtsAudio.src = '';
+                } catch (_) {}
+                currentTtsAudio = null;
+            }
+
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel();
+            }
+        }
+
+        function speakBrowserFallback(ttsPayload, fallbackText) {
+            if (!ttsEnabled) return;
+            if (!('speechSynthesis' in window) || typeof SpeechSynthesisUtterance === 'undefined') return;
+
+            const text = (ttsPayload && typeof ttsPayload.text === 'string' && ttsPayload.text.trim())
+                ? ttsPayload.text
+                : (fallbackText ? String(fallbackText) : '');
+
+            if (!text) return;
+
+            try {
+                stopTtsPlayback();
+                const utterance = new SpeechSynthesisUtterance(text);
+
+                if (ttsPayload && typeof ttsPayload.browser_rate === 'number') utterance.rate = ttsPayload.browser_rate;
+                if (ttsPayload && typeof ttsPayload.browser_pitch === 'number') utterance.pitch = ttsPayload.browser_pitch;
+                if (ttsPayload && typeof ttsPayload.browser_volume === 'number') utterance.volume = ttsPayload.browser_volume;
+
+                window.speechSynthesis.speak(utterance);
+            } catch (err) {
+                console.error('TTS playback error:', err);
+            }
+        }
+
+        function buildServerTtsUrl(ttsPayload, fallbackText) {
+            const text = (ttsPayload && typeof ttsPayload.text === 'string' && ttsPayload.text.trim())
+                ? ttsPayload.text
+                : (fallbackText ? String(fallbackText) : '');
+
+            if (!text) return null;
+
+            const params = new URLSearchParams({ text });
+            if (ttsPayload && typeof ttsPayload.intent === 'string' && ttsPayload.intent) params.set('intent', ttsPayload.intent);
+            if (ttsPayload && typeof ttsPayload.voice === 'string' && ttsPayload.voice) params.set('voice', ttsPayload.voice);
+            if (ttsPayload && typeof ttsPayload.rate === 'string' && ttsPayload.rate) params.set('rate', ttsPayload.rate);
+            if (ttsPayload && typeof ttsPayload.pitch === 'string' && ttsPayload.pitch) params.set('pitch', ttsPayload.pitch);
+            if (ttsPayload && typeof ttsPayload.volume === 'string' && ttsPayload.volume) params.set('volume', ttsPayload.volume);
+
+            return `/tts/audio?${params.toString()}`;
+        }
+
+        function speakTts(ttsPayload, fallbackText) {
+            if (!ttsEnabled) return;
+
+            const audioUrl = buildServerTtsUrl(ttsPayload, fallbackText);
+            if (!audioUrl) {
+                speakBrowserFallback(ttsPayload, fallbackText);
+                return;
+            }
+
+            try {
+                stopTtsPlayback();
+
+                const audio = new Audio(audioUrl);
+                currentTtsAudio = audio;
+                audio.preload = 'auto';
+
+                audio.onerror = () => {
+                    if (currentTtsAudio === audio) currentTtsAudio = null;
+                    speakBrowserFallback(ttsPayload, fallbackText);
+                };
+
+                audio.onended = () => {
+                    if (currentTtsAudio === audio) currentTtsAudio = null;
+                };
+
+                const playPromise = audio.play();
+                if (playPromise && typeof playPromise.catch === 'function') {
+                    playPromise.catch((err) => {
+                        console.error('Server TTS playback error:', err);
+                        if (currentTtsAudio === audio) currentTtsAudio = null;
+                        speakBrowserFallback(ttsPayload, fallbackText);
+                    });
+                }
+            } catch (err) {
+                console.error('Server TTS setup error:', err);
+                speakBrowserFallback(ttsPayload, fallbackText);
+            }
+        }
+
+        async function loadInitialUiState() {
+            try {
+                const response = await fetch('/state');
+                if (!response.ok) return;
+                const state = await response.json();
+                if (state && typeof state.tts_enabled === 'boolean') {
+                    ttsEnabled = state.tts_enabled;
+                    setTtsButtonState(ttsEnabled);
+                }
+            } catch (_) {}
+        }
+
+        async function uploadAudioChunk(blob, chunkMeta) {
             if (!blob || blob.size === 0) return;
 
             const form = new FormData();
             form.append('audio', blob, 'chunk.webm');
+            const sessionId = (chunkMeta && typeof chunkMeta.sessionId === 'string' && chunkMeta.sessionId)
+                ? chunkMeta.sessionId
+                : asrSessionId;
+            if (sessionId) form.append('session_id', sessionId);
+            if (chunkMeta && Number.isInteger(chunkMeta.index)) form.append('chunk_index', String(chunkMeta.index));
+            if (chunkMeta && typeof chunkMeta.startedAtMs === 'number') form.append('chunk_started_at_ms', String(chunkMeta.startedAtMs));
 
-            const response = await fetch('/verification/audiostream', {
+            const response = await fetch('/asr/audiostream', {
                 method: 'POST',
                 body: form
             });
@@ -143,15 +322,142 @@
                 throw new Error(errorText);
             }
 
-            return response.json();
+            const data = await response.json();
+            return data;
         }
 
-        function queueAudioUpload(blob) {
+        async function finalizeAsrSession(sessionId) {
+            if (!sessionId) return null;
+
+            const form = new FormData();
+            form.append('session_id', sessionId);
+            form.append('finalize', 'true');
+
+            const response = await fetch('/asr/audiostream', {
+                method: 'POST',
+                body: form
+            });
+
+            if (!response.ok) {
+                let errorText = `HTTP ${response.status} from server`;
+                try {
+                    const data = await response.json();
+                    if (data && data.error) errorText = data.error;
+                } catch (_) {}
+                throw new Error(errorText);
+            }
+
+            const data = await response.json();
+            return data;
+        }
+
+        function handleTranscriptUpdate(data) {
+            const transcript = data && data.transcript ? data.transcript : null;
+            if (!transcript) return;
+
+            if (transcript.error) {
+                console.warn('ASR chunk skipped:', transcript.error);
+            }
+
+            if (typeof transcript.applied_through_index === 'number') {
+                if (transcript.applied_through_index < lastAppliedAsrIndex) return;
+                lastAppliedAsrIndex = transcript.applied_through_index;
+            }
+
+            if (!transcript.updated) return;
+            const delta = typeof transcript.delta === 'string' ? transcript.delta.trim() : '';
+            if (!delta) return;
+
+            const current = (userInput.value || '').trim();
+            const nextValue = current ? `${current} ${delta}` : delta;
+            writeUserInputFromAsr(nextValue);
+        }
+
+        function queueAudioUpload(blob, chunkMeta) {
             micUploadChain = micUploadChain
-                .then(() => uploadAudioChunk(blob))
+                .then(() => uploadAudioChunk(blob, chunkMeta))
+                .then((data) => {
+                    handleTranscriptUpdate(data);
+                })
                 .catch((err) => {
                     console.error('Mic upload error:', err);
                 });
+        }
+
+        function queueAsrFinalize(sessionId) {
+            if (!sessionId) return;
+
+            micUploadChain = micUploadChain
+                .then(() => finalizeAsrSession(sessionId))
+                .then((data) => {
+                    handleTranscriptUpdate(data);
+                })
+                .catch((err) => {
+                    console.error('ASR finalize error:', err);
+                });
+        }
+
+        function clearMicRecorderRestartTimer() {
+            if (micRecorderRestartTimer) {
+                clearTimeout(micRecorderRestartTimer);
+                micRecorderRestartTimer = null;
+            }
+        }
+
+        function scheduleMicRecorderStop() {
+            clearMicRecorderRestartTimer();
+            micRecorderRestartTimer = setTimeout(() => {
+                if (micRecorder && micRecorder.state === 'recording') {
+                    micRecorder.stop();
+                }
+            }, MIC_CHUNK_MS);
+        }
+
+        function startMicRecorderCycle() {
+            if (!micMediaStream) return;
+
+            micRecorder = micRecorderMimeType
+                ? new MediaRecorder(micMediaStream, { mimeType: micRecorderMimeType })
+                : new MediaRecorder(micMediaStream);
+
+            micRecorder.ondataavailable = (event) => {
+                if (!event.data || event.data.size === 0) return;
+                const chunkMeta = {
+                    sessionId: asrSessionId,
+                    index: asrChunkIndex,
+                    startedAtMs: Math.max(0, Math.round(performance.now() - asrSessionStartedAt))
+                };
+                asrChunkIndex += 1;
+                queueAudioUpload(event.data, chunkMeta);
+            };
+
+            micRecorder.onerror = (event) => {
+                console.error('Mic recorder error:', event);
+            };
+
+            micRecorder.onstop = () => {
+                clearMicRecorderRestartTimer();
+
+                if (!isMicStreaming) {
+                    if (micMediaStream) {
+                        micMediaStream.getTracks().forEach(t => t.stop());
+                    }
+                    micMediaStream = null;
+                    micRecorder = null;
+
+                    if (pendingAsrFinalizeSessionId) {
+                        const finalSessionId = pendingAsrFinalizeSessionId;
+                        pendingAsrFinalizeSessionId = null;
+                        queueAsrFinalize(finalSessionId);
+                    }
+                    return;
+                }
+
+                startMicRecorderCycle();
+            };
+
+            micRecorder.start();
+            scheduleMicRecorderStop();
         }
 
         async function startMicStreaming() {
@@ -165,41 +471,26 @@
             }
 
             micMediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            startFreshAsrSession();
+            pendingAsrFinalizeSessionId = null;
 
             const preferredMimeTypes = [
                 'audio/webm;codecs=opus',
                 'audio/webm'
             ];
-            const selectedMimeType = preferredMimeTypes.find(t => MediaRecorder.isTypeSupported(t));
-            micRecorder = selectedMimeType ? new MediaRecorder(micMediaStream, { mimeType: selectedMimeType }) : new MediaRecorder(micMediaStream);
-
-            micRecorder.ondataavailable = (event) => {
-                if (!event.data) return;
-                queueAudioUpload(event.data);
-            };
-
-            micRecorder.onerror = (event) => {
-                console.error('Mic recorder error:', event);
-            };
-
-            micRecorder.onstop = () => {
-                if (micMediaStream) {
-                    micMediaStream.getTracks().forEach(t => t.stop());
-                }
-                micMediaStream = null;
-                micRecorder = null;
-            };
+            micRecorderMimeType = preferredMimeTypes.find(t => MediaRecorder.isTypeSupported(t)) || null;
 
             isMicStreaming = true;
             setListeningState(true);
 
-            // Start recording and emit chunks periodically (live feed)
-            micRecorder.start(1000);
+            startMicRecorderCycle();
         }
 
         function stopMicStreaming() {
             isMicStreaming = false;
             setListeningState(false);
+            pendingAsrFinalizeSessionId = asrSessionId;
+            clearMicRecorderRestartTimer();
 
             try {
                 if (micRecorder && micRecorder.state !== 'inactive') {
@@ -209,10 +500,18 @@
                 console.error('Failed to stop mic recorder:', err);
             }
 
-            if (micMediaStream) {
-                micMediaStream.getTracks().forEach(t => t.stop());
-                micMediaStream = null;
+            if ((!micRecorder || micRecorder.state === 'inactive') && pendingAsrFinalizeSessionId) {
+                if (micMediaStream) {
+                    micMediaStream.getTracks().forEach(t => t.stop());
+                    micMediaStream = null;
+                }
+                const finalSessionId = pendingAsrFinalizeSessionId;
+                pendingAsrFinalizeSessionId = null;
+                queueAsrFinalize(finalSessionId);
             }
+
+            micRecorderMimeType = null;
+            asrSessionId = null;
         }
 
         async function toggleMicStreaming() {
@@ -244,13 +543,13 @@
             const useLLM = document.getElementById('llm-toggle').checked;
             
             appendMessage('User', text);
-            userInput.value = '';
+            writeUserInputFromAsr('');
 
             try {
                 const response = await fetch('/chat', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({text: text, use_llm: useLLM})
+                    body: JSON.stringify({text: text, use_llm: useLLM, tts_enabled: ttsEnabled})
                 });
                 
                 const data = await response.json();
@@ -262,8 +561,10 @@
 
                 appendMessage('Atlas', data.response);
 
+                speakTts(data.tts, data.response);
+
                 // 2. Update Image safely (checks if elements exist first)
-                if(data.image_updated || text.toLowerCase() === 'restart') {
+                if(data.image_updated) {
                     if (gameRender) {
                         gameRender.src = `/latest_image?t=${new Date().getTime()}`;
                         gameRender.classList.remove('hidden');
@@ -276,6 +577,36 @@
                 // 3. Update Timers safely (checks if state exists)
                 if (data.state && data.state.active_timers) {
                     updateTimers(data.state.active_timers);
+                }
+
+                if (data.intent === "weather" && data.success && data.data) {
+                    const weatherData = data.data;
+                    const iconElement = document.getElementById('weather-icon');
+                    const weatherBox = document.getElementById('weather-box');
+
+                    if (weatherBox && weatherData.theme) {
+                        const baseClasses = "flex-1 rounded flex flex-col items-center justify-evenly border p-4 transition-all duration-700";
+                        weatherBox.className = `${baseClasses} ${weatherData.theme}`;
+                    }
+
+                    if (iconElement && weatherData.icon && weatherData.theme) {
+                        const colorMatch = weatherData.theme.match(/text-\w+-\d+/);
+                        iconElement.setAttribute('data-feather', weatherData.icon);
+                        if (colorMatch) iconElement.className = `w-20 h-20 ${colorMatch[0]}`;
+                        iconElement.setAttribute('data-feather', weatherData.icon);
+                    }
+
+                    const descElement = document.getElementById('weather-desc');
+                    if (descElement) {
+                        descElement.innerText = `${weatherData.weather_condition} | ${weatherData.temperature}${weatherData.temperature_unit}`;
+                    }
+
+                    const locElement = document.getElementById('weather-location');
+                    if (locElement) {
+                        locElement.innerText = `${weatherData.city}, ${weatherData.country}`;
+                    }
+
+                    renderFeatherIcons();
                 }
 
             } catch (error) {
@@ -321,6 +652,8 @@
 
         renderFeatherIcons();
         setListeningState(false);
+        setTtsButtonState(ttsEnabled);
+        loadInitialUiState();
     </script>
 </body>
 </html>

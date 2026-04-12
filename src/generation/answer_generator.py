@@ -6,6 +6,7 @@ from collections import defaultdict
 
 from src.intent_constants import BASIC_INTENTS, API_INTENTS, GARDEN_INTENTS
 from src.generation.answer_templates import BASIC_TEMPLATES, API_TEMPLATES, GARDEN_TEMPLATES, SYSTEM_PROMPTS
+from src.generation.tts import build_tts_payload, server_tts_available, stream_tts_audio
 
 class AnswerGenerator:
     def __init__(self, model_name="meta-llama/Llama-3.2-1B-Instruct"): # We could pass device in since it's also used in inference.py or pass the model from the main pipeline
@@ -120,3 +121,14 @@ class AnswerGenerator:
                 details[key] = self.format_response(value)
 
         return template.format_map(details)
+    
+    
+
+    def text_to_speech(self, text, intent=None):
+        return build_tts_payload(text=text, intent=intent)
+
+    def stream_text_to_speech(self, tts_payload):
+        return stream_tts_audio(tts_payload)
+
+    def server_tts_available(self):
+        return server_tts_available()

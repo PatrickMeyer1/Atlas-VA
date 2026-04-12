@@ -10,7 +10,7 @@ class FulfillmentDispatcher:
         self.api_fulfillment = APIFulfillment()
 
     def dispatch(self, intent_dict):
-        intent = intent_dict.get("intent")
+        intent = intent_dict.get("intent", "oos") # set to oos if something goes wrong or is missing
 
         if intent in BASIC_INTENTS:
             return self.basic_fulfillment.fulfill(intent_dict)
