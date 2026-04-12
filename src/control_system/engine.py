@@ -106,7 +106,7 @@ class GardenEngine:
                 elif current_tile["type"] == TileType.WATERED:
                     result.update({"success": False, "error_code": "tile_already_watered"})
                 elif current_tile["type"] == TileType.TILLED:
-                    result.update({"success": False, "error_code": "already_tilled"})
+                    result.update({"success": False, "error_code": "already_tilled", "data": {"pos": (x_position, y_position)}})
                 elif current_tile["type"] == TileType.GRASS:
                     current_tile["type"] = TileType.TILLED
                     result.update({"is_changed": True, "success": True, "data": {"pos": (x_position, y_position)}})

@@ -28,12 +28,17 @@ class APIFulfillment:
         highest_score = 0.0
         THRESHOLD = 0.6
 
+        variants = {query_name, query_name.rstrip('s')}
+        if query_name.endswith('ies'):
+            variants.add(query_name[:-3] + 'y')
+
         for plant in plant_list:
             common_name = self._clean_plant_name(plant.get("common_name", ""))
-            scientific_name = [self._clean_plant_name(p) for p in plant.get("scientific_name", [])] # array response
+            # scientific_names = [self._clean_plant_name(p) for p in plant.get("scientific_name", [])] # array response
 
             # exact match (priority 1)
-            if query_name == common_name or query_name in scientific_name:
+            # if common_name in variants or any(query_name in s for s in scientific_names):
+            if common_name in variants:
                 return plant.get("id")
             
             # substrings (priority 2)
@@ -42,9 +47,7 @@ class APIFulfillment:
             if current_score > highest_score and current_score >= THRESHOLD:
                 highest_score = current_score
                 best_match = plant.get("id")
-                
-            print(f"{query_name}, {common_name}, {current_score}")
-        
+                        
         return best_match
         
     def _get_api_data(self, endpoint, parameters=None):
@@ -62,19 +65,26 @@ class APIFulfillment:
         
     def _get_species_details(self, plant_name):
         clean_name = self._clean_plant_name(plant_name)
+
+        search_terms = {clean_name}
         
         # blueberries, strawberries -> map to end singular with y
         if clean_name.endswith('ies'):
-            singular_y = clean_name[:-3] + "y"
-            search_res = self._get_api_data(self.SPECIES_LIST, {"q": singular_y})
+            search_terms.add(clean_name[:-3] + "y")
         else:
-            singular_s = clean_name.rstrip('s')
-            search_res = self._get_api_data(self.SPECIES_LIST, {"q": singular_s})
+            search_terms.add(clean_name.rstrip('s'))
 
-        if not search_res or not search_res.get("data"):
+        all_results = []
+        for term in search_terms:
+            res = self._get_api_data(self.SPECIES_LIST, {"q": term})
+            if res and res.get("data"):
+                all_results.extend(res["data"])
+
+        if not all_results:
             return None
         
-        best_match_id = self._get_best_match(clean_name, search_res.get("data"))
+        # best match form all results
+        best_match_id = self._get_best_match(clean_name, all_results)
 
         if not best_match_id:
             return None
