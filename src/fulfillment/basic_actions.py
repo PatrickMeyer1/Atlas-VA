@@ -2,7 +2,7 @@ from text_to_num import text2num
 import time
 import requests
 
-from src.fulfillment.weather_constants import WEATHER_CODE_MAP, WEATHER_ICON_MAP, WEATHER_THEME_MAP
+from src.fulfillment.constants import WEATHER_CODE_MAP, WEATHER_ICON_MAP, WEATHER_THEME_MAP
 
 class BasicFulfillment:
     def __init__(self):
@@ -77,7 +77,7 @@ class BasicFulfillment:
                 if not slots.get("duration"):
                     return {"intent": intent, "success": False, "error_code": "missing_duration", "data": {"timername": slots.get("timername", "standard")}}
                 
-                timer_name = slots.get("timername", "standard")
+                timer_name = slots.get("timername", "standard").capitalize()
 
                 # need to parse duration and unit in same slot
                 duration_str = slots["duration"]
