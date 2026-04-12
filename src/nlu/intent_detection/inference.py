@@ -68,6 +68,9 @@ class VoiceAssistantNLU:
 
                 val = tokens[idx].replace("##", "")
 
+                if val in [",", ".", "!", "?", ":", ";"] or not val.strip(): # skip punctuation
+                    continue
+
                 # is it the start of a new word
                 if idx == 0 or word_id != word_ids[idx-1]:
 
