@@ -107,7 +107,7 @@ BASIC_TEMPLATES = {
     "oos": {
         "success": [
             "I'm sorry, I can't do that yet.",
-            "I'm not quite sure how to help with that. Should we focus on the something else?",
+            "I'm not quite sure how to help with that. Should we focus on something else?",
             "That's outside of my current expertise. Let's stick to something else for now."
         ]
     },

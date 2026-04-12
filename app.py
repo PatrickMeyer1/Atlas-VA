@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify, send_file
+from flask import Flask, Response, jsonify, render_template, request, send_file, stream_with_context
 import os
 import glob
 from pathlib import Path
@@ -21,6 +21,7 @@ generator = AnswerGenerator()
 ui_state = {
     "is_locked": True,
     "is_listening": False,
+    "tts_enabled": True,
     "active_timers": []
 }
 
@@ -31,8 +32,12 @@ def index():
 # Receive audio data and return a response (now just text) TO CHANGE TO AUDIO
 @app.route('/chat', methods=['POST'])
 def chat():
-    user_text = request.json.get('text', '')
-    use_llm = request.json.get('use_llm', False)
+    req_payload = request.get_json(silent=True) or {}
+    user_text = req_payload.get('text', '')
+    use_llm = req_payload.get('use_llm', False)
+
+    if "tts_enabled" in req_payload:
+        ui_state["tts_enabled"] = bool(req_payload.get("tts_enabled"))
 
     # NLU
     intent_result = nlu.process_utterance(user_text)
@@ -43,17 +48,50 @@ def chat():
     # Generation
     response_text = generator.generate_answer(fulfillment_result, use_llm=use_llm)
 
+    tts = None
+    if ui_state.get("tts_enabled"):
+        tts = generator.text_to_speech(response_text, intent=fulfillment_result.get("intent"))
+
     if fulfillment_result.get("intent") == "timer" and fulfillment_result.get("success"):
         ui_state["active_timers"].append(fulfillment_result["data"])
 
     return jsonify({
         "response": response_text,
+        "tts": tts,
         "intent": intent_result.get("intent"),
         "success": fulfillment_result.get("success"),
         "data": fulfillment_result.get("data"),
         "state": ui_state,
         "image_updated": fulfillment_result.get("is_changed", False)
     })
+
+
+@app.route('/tts/audio', methods=['GET'])
+def tts_audio():
+    text = request.args.get('text', '')
+    intent = request.args.get('intent')
+
+    if not text or not str(text).strip():
+        return jsonify({"error": "Missing text"}), 400
+
+    if not generator.server_tts_available():
+        return jsonify({"error": "Server-side TTS requires the edge-tts package."}), 503
+
+    tts_payload = generator.text_to_speech(text, intent=intent)
+
+    for field in ("voice", "rate", "pitch", "volume"):
+        value = request.args.get(field)
+        if value:
+            tts_payload[field] = value
+
+    return Response(
+        stream_with_context(generator.stream_text_to_speech(tts_payload)),
+        mimetype='audio/mpeg',
+        headers={
+            "Cache-Control": "no-store",
+            "Content-Disposition": 'inline; filename="atlas-response.mp3"',
+        },
+    )
 
 @app.route('/verification/audiostream', methods=['POST'])
 def verification_audio():
