@@ -38,7 +38,7 @@ _load_env_file()
 app = Flask(__name__)
 
 # Components
-nlu = None
+nlu = VoiceAssistantNLU()
 dispatcher = FulfillmentDispatcher()
 generator = AnswerGenerator()
 

@@ -18,12 +18,14 @@ class AnswerGenerator:
 
         token = os.getenv("HF_TOKEN") or os.getenv("HUGGINGFACEHUB_API_TOKEN")
 
+        device = torch.device("cuda" if torch.cuda.is_available() else ("mps" if torch.backends.mps.is_available() else "cpu"))
+
         # Lazy-load so app startup doesn't require Hugging Face auth.
         self.model = pipeline(
             "text-generation",
             model=self.model_name,
             dtype="auto",
-            device_map="auto",
+            device=device,
             token=token,
         )
 
