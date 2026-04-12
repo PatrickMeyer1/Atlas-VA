@@ -1,3 +1,27 @@
+# ---- PLANTS ----
+
+PLANT_ENVIRONMENT_MAPPING = {
+    "indoor": ["indoor", "indoors", "inside", "house", "home"],
+    "outdoor": ["outdoor", "outdoors", "outside", "garden", "yard"]
+}
+
+NL_MAPPING = {
+    "sunlight": {
+        "full shade": "full shade",
+        "part shade": "partial shade",
+        "part sun/part shade": "a mix of sun and partial shade",
+        "full sun": "full sun"
+    },
+    "watering": {
+        "none": "no watering",
+        "minimum": "very little water",
+        "average": "a moderate amount of water",
+        "frequent": "frequent watering"
+    }
+}
+
+# ---- WEATHER ----
+
 WEATHER_CODE_MAP = {
     0: "clear sky",
     1: "mainly clear",

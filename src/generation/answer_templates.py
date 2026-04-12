@@ -55,6 +55,34 @@ SYSTEM_PROMPTS = {
         Summarize the available actions naturally, grouping them by movement, plant care, and resource gathering.
     """,
     "api": """
+        For each of the following botanical queries, generate a natural, helpful, and slightly enthusiastic response based on the data provided. Avoid technical jargon or mentioning specific API error codes.
+
+        - [Sunlight Success] Data: {'INTENT': 'get_plant_sunlight', 'RESULT': 'COMMAND_SUCCESSFUL', 'plant': 'Aloe Vera', 'sunlight': 'bright, indirect light'}
+        Confirm the specific sunlight needs for the mentioned plant.
+
+        - [Sunlight Failure] Data: {'INTENT': 'get_plant_sunlight', 'RESULT': 'COMMAND_FAILED_ERROR', 'ERROR_TYPE': 'plant_not_found', 'plantname': 'Roses'}
+        Politely explain that the plant wasn't found in the records and suggest checking the spelling or using a common name.
+
+        - [Watering Success] Data: {'INTENT': 'get_plant_watering_care', 'RESULT': 'COMMAND_SUCCESSFUL', 'plant': 'Fiddle Leaf Fig', 'frequency': 'moderate', 'value': '7-10', 'unit': 'days'}
+        Provide the general watering frequency and the specific time interval (value and unit).
+
+        - [Watering Failure] Data: {'INTENT': 'get_plant_watering_care', 'RESULT': 'COMMAND_FAILED_ERROR', 'ERROR_TYPE': 'no_water_frequency_information', 'plant': 'Jade Plant'}
+        Inform the user that while you know the plant, you don't have a specific day-to-day watering benchmark for it yet.
+
+        - [Cycle Success] Data: {'INTENT': 'get_plant_cycle', 'RESULT': 'COMMAND_SUCCESSFUL', 'plant': 'Sunflower', 'cycle': 'annual'}
+        Identify the growth cycle of the plant (e.g., annual, perennial) in a clear sentence.
+
+        - [Edibility Success] Data: {'INTENT': 'get_plant_edibility', 'RESULT': 'COMMAND_SUCCESSFUL', 'plant': 'Basil', 'is_edible': 'edible'}
+        Confirm whether the plant is edible or not, and always include a brief, friendly safety reminder about consuming plants.
+
+        - [Environment Search Success] Data: {'INTENT': 'search_plants_by_environment', 'RESULT': 'COMMAND_SUCCESSFUL', 'quantity': 3, 'environment': 'indoor', 'plants': 'Snake Plant, Pothos, and ZZ Plant'}
+        List the number of plants found for the specific environment and name them clearly.
+
+        - [Environment Search Failure] Data: {'INTENT': 'search_plants_by_environment', 'RESULT': 'COMMAND_FAILED_ERROR', 'ERROR_TYPE': 'invalid_environment'}
+        Explain that the environment type wasn't recognized and ask them to specify 'indoor' or 'outdoor'.
+
+        - [General API Failure] Data: {'INTENT': 'search_plants_by_environment', 'RESULT': 'COMMAND_FAILED_ERROR', 'ERROR_TYPE': 'api_error'}
+        Apologize for the connection issue and suggest they try their search again in a moment.
     """,
     "basic": """
         - [Greetings] Data: {'INTENT': 'greetings', 'RESULT': 'COMMAND_SUCCESSFUL', 'ERROR_TYPE': None}
@@ -160,7 +188,131 @@ BASIC_TEMPLATES = {
 }
 
 API_TEMPLATES = {
-
+    "get_plant_sunlight": {
+        "success": [
+            "The {plant} thrives best in {sunlight}.",
+            "For the {plant}, you'll want to aim for {sunlight}.",
+            "According to my records, the {plant} prefers {sunlight}."
+        ],
+        "failure": {
+            "missing_plantname_slot": [
+                "Which plant were you asking about? I need a name to check the sunlight needs.",
+                "I can look that up for you, but I didn't catch the name of the plant.",
+                "Tell me which plant you're curious about and I'll find its sunlight requirements."
+            ],
+            "plant_not_found": [
+                "I couldn't find a plant named '{plantname}' in my database. Could it be under a different name?",
+                "My records don't show any information for '{plantname}'. Mind double-checking the spelling?",
+                "I searched the nursery but couldn't find '{plantname}'. Are you sure that's the right name?"
+            ],
+            "no_sunlight_information": [
+                "I found the {plant}, but unfortunately, there's no sunlight data available for it right now.",
+                "My sources don't specify the light requirements for the {plant} yet.",
+                "I have the {plant} in my records, but the sunlight details are currently missing."
+            ]
+        }
+    },
+    "get_plant_watering_care": {
+        "success": [
+            "The {plant} generally needs {frequency}. Aim for about every {value} {unit}.",
+            "For the {plant}, you're looking at {frequency}, specifically about every {value} {unit}.",
+            "The {plant} prefers {frequency}. You should water it roughly every {value} {unit}."
+        ],
+        "failure": {
+            "missing_plantname_slot": [
+                "I'd love to help your garden grow, but which plant do you need watering info for?",
+                "I need a plant name to look up watering benchmarks. Which one are you asking about?",
+                "Which plant should I check the watering schedule for?"
+            ],
+            "plant_not_found": [
+                "I can't find '{plantname}' in my plant records. Is there another name it might go by?",
+                "I searched for '{plantname}' but didn't find any watering guides. Double-check the name for me?",
+                "I'm not seeing '{plantname}' in the database, so I can't give you a watering benchmark just yet."
+            ],
+            "no_water_care_information": [
+                "I found the {plant}, but I don't have any specific care instructions for it.",
+                "Information on watering the {plant} seems to be missing from my database.",
+                "I can see the {plant} here, but the care guide hasn't been updated with watering details."
+            ],
+            "no_water_frequency_information": [
+                "I know the {plant} needs attention, but I don't have a specific day-to-day benchmark for it.",
+                "I found the {plant}, but the specific watering frequency isn't listed in my records.",
+                "The database is missing the exact watering interval for the {plant} at the moment."
+            ]
+        }
+    },
+    "get_plant_cycle": {
+        "success": [
+            "The {plant} follows {cycle} growth cycle.",
+            "My records show that the {plant} is {cycle}.",
+            "The {plant} is classified as {cycle}."
+        ],
+        "failure": {
+            "missing_plantname_slot": [
+                "I can check the growth cycle for you! Which plant are we talking about?",
+                "I didn't catch the name of the plant you want to check the cycle for.",
+                "To tell you the cycle, I first need to know which plant you're interested in."
+            ],
+            "plant_not_found": [
+                "I couldn't find a plant called '{plantname}' to check its cycle.",
+                "'{plantname}' isn't showing up in my records. Is it an annual or a perennial? I'd need the name to be sure.",
+                "I'm having trouble finding '{plantname}'. Could you repeat the name?"
+            ],
+            "no_cycle_information": [
+                "I found the {plant}, but my data doesn't specify its growth cycle yet.",
+                "The cycle information for the {plant} is currently unavailable in my records.",
+                "I've located the {plant}, but I'm not sure if it's an annual or perennial just yet."
+            ]
+        }
+    },
+    "get_plant_edibility": {
+        "success": [
+            "According to my records, the {plant} is {is_edible}.",
+            "I checked the safety guides, and the {plant} is considered {is_edible}.",
+            "Regarding edibility: the {plant} is {is_edible}. Always be careful before consuming any new plant!"
+        ],
+        "failure": {
+            "missing_plantname_slot": [
+                "Safety first! Which plant are you asking about regarding edibility?",
+                "I need a plant name before I can tell you if it's edible or not.",
+                "Which plant's edibility status should I look up?"
+            ],
+            "plant_not_found": [
+                "I can't find '{plantname}' in my records, so I can't confirm if it's edible. Better stay safe for now!",
+                "I'm not seeing '{plantname}' in my database. I'd avoid eating it until we're sure.",
+                "I searched for '{plantname}' but didn't find any safety or edibility information."
+            ]
+        }
+    },
+    "search_plants_by_environment": {
+        "success": [
+            "I've gathered {quantity} {environment} plants for you: {plants}. Any of those catch your eye?",
+            "Sure thing! Here are {quantity} {environment} plants to consider: {plants}.",
+            "Done. I found these {environment} species for you: {plants}. Just don't blame me if you end up buying them all!"
+        ],
+        "failure": {
+            "missing_environment_slot": [
+                "I can certainly help you find some plants, but I need to know if they're for an indoor or outdoor environment.",
+                "To give you the best suggestions, could you tell me if you're looking for indoor or outdoor greenery?",
+                "I'm ready to search! Just let me know if you want to see indoor or outdoor plants."
+            ],
+            "invalid_environment": [
+                "I'm not quite sure which environment you mean. Could you specify if you're looking for indoor or outdoor plants?",
+                "I didn't recognize that environment. Are we looking for plants that grow inside or outside?",
+                "Stick to indoor or outdoor for your environment search."
+            ],
+            "api_error": [
+                "My plant database is being a bit stubborn right now. Mind trying again in a moment?",
+                "I'm having trouble reaching the API at the moment. Let's try that search again later.",
+                "I encountered an error while searching. My green thumb must be a bit rusty today. Give me a second to fix it."
+            ],
+            "quantity_parsing_error": [
+                "I couldn't quite make sense of the amount of plants you wanted. Could you say that a bit differently?",
+                "I'm having trouble processing your quantity. Try using a simpler format.",
+                "Your plant quantity tripped me up. Could you try rephrasing it?"
+            ]
+        }
+    }
 }
 
 GARDEN_TEMPLATES = {

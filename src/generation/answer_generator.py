@@ -33,10 +33,12 @@ class AnswerGenerator:
     def format_response(self, items):
         if not items:
             return ""
-        elif len(items) == 1:
+        if len(items) == 1:
             return str(items[0])
+        if len(items) == 2:
+            return f"{items[0]} and {items[1]}"
         else:
-            return ", ".join(map(str, items[:-1])) + " and " + str(items[-1])
+            return ", ".join(map(str, items[:-1])) + ", and " + str(items[-1])
 
     def generate_answer(self, raw_data, use_llm=False):
         if use_llm:
