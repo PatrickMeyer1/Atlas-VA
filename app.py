@@ -5,17 +5,20 @@ from pathlib import Path
 from src.nlu.intent_detection.inference import VoiceAssistantNLU
 from src.generation.answer_generator import AnswerGenerator
 from src.fulfillment.dispatcher import FulfillmentDispatcher
-from src.user_auth import verification
+from src.user_auth import asr
 from config import load_env_file
 
 load_env_file()
 
 app = Flask(__name__)
 
+app.debug = True
+
 # Components
 nlu = VoiceAssistantNLU()
 dispatcher = FulfillmentDispatcher()
 generator = AnswerGenerator()
+asr.ensure_asr_ready()
 
 # global state for UI
 ui_state = {
@@ -93,9 +96,22 @@ def tts_audio():
         },
     )
 
+
+@app.route('/asr/audiostream', methods=['POST'])
 @app.route('/verification/audiostream', methods=['POST'])
-def verification_audio():
+def microphone_audio():
     audio_file = request.files.get('audio')
+    session_id = (request.form.get('session_id') or 'default').strip() or 'default'
+    finalize = str(request.form.get('finalize', '')).strip().lower() in {"1", "true", "yes"}
+    chunk_index_raw = request.form.get('chunk_index')
+    chunk_started_at_ms_raw = request.form.get('chunk_started_at_ms')
+
+    chunk_index = int(chunk_index_raw) if chunk_index_raw not in (None, "") else None
+    chunk_started_at_ms = float(chunk_started_at_ms_raw) if chunk_started_at_ms_raw not in (None, "") else None
+
+    if finalize and audio_file is None:
+        transcript = asr.finalize_session(session_id=session_id)
+        return jsonify({"ok": True, "transcript": transcript})
 
     if audio_file is None:
         return jsonify({"error": "Missing audio file"}), 400
@@ -104,12 +120,15 @@ def verification_audio():
     if not chunk_bytes:
         return jsonify({"error": "Empty audio chunk"}), 400
 
-    stats = verification.ingest_audio_chunk(
+    transcript = asr.ingest_audio_chunk(
         chunk_bytes=chunk_bytes,
         mimetype=audio_file.mimetype,
+        session_id=session_id,
+        chunk_index=chunk_index,
+        chunk_started_at_ms=chunk_started_at_ms,
     )
-    
-    return jsonify({"ok": True, "verification": stats})
+
+    return jsonify({"ok": True, "transcript": transcript})
 
 # Fetch last image generated
 @app.route('/latest_image')

@@ -4,3 +4,4 @@ src/nlu/intent_detection/models/bert_finetuned/*
 .DS_Store
 .venv/*
 .env
+.cache

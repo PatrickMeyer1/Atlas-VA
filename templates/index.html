@@ -115,6 +115,14 @@
         let micRecorder = null;
         let micUploadChain = Promise.resolve();
         let currentTtsAudio = null;
+        let asrSessionId = null;
+        let asrChunkIndex = 0;
+        let asrSessionStartedAt = 0;
+        let lastAppliedAsrIndex = -1;
+        let pendingAsrFinalizeSessionId = null;
+        let micRecorderMimeType = null;
+        let micRecorderRestartTimer = null;
+        const MIC_CHUNK_MS = 3000;
 
         // Allow Enter key to send
         userInput.addEventListener("keypress", function(event) {
@@ -125,6 +133,23 @@
             if (window.feather && typeof window.feather.replace === 'function') {
                 window.feather.replace();
             }
+        }
+
+        function createAsrSessionId() {
+            return (window.crypto && typeof window.crypto.randomUUID === 'function')
+                ? window.crypto.randomUUID()
+                : `asr-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+        }
+
+        function writeUserInputFromAsr(text) {
+            userInput.value = text;
+        }
+
+        function startFreshAsrSession() {
+            asrSessionId = createAsrSessionId();
+            asrChunkIndex = 0;
+            asrSessionStartedAt = performance.now();
+            lastAppliedAsrIndex = -1;
         }
 
         function setListeningState(streaming) {
@@ -271,13 +296,19 @@
             } catch (_) {}
         }
 
-        async function uploadAudioChunk(blob) {
+        async function uploadAudioChunk(blob, chunkMeta) {
             if (!blob || blob.size === 0) return;
 
             const form = new FormData();
             form.append('audio', blob, 'chunk.webm');
+            const sessionId = (chunkMeta && typeof chunkMeta.sessionId === 'string' && chunkMeta.sessionId)
+                ? chunkMeta.sessionId
+                : asrSessionId;
+            if (sessionId) form.append('session_id', sessionId);
+            if (chunkMeta && Number.isInteger(chunkMeta.index)) form.append('chunk_index', String(chunkMeta.index));
+            if (chunkMeta && typeof chunkMeta.startedAtMs === 'number') form.append('chunk_started_at_ms', String(chunkMeta.startedAtMs));
 
-            const response = await fetch('/verification/audiostream', {
+            const response = await fetch('/asr/audiostream', {
                 method: 'POST',
                 body: form
             });
@@ -291,15 +322,142 @@
                 throw new Error(errorText);
             }
 
-            return response.json();
+            const data = await response.json();
+            return data;
         }
 
-        function queueAudioUpload(blob) {
+        async function finalizeAsrSession(sessionId) {
+            if (!sessionId) return null;
+
+            const form = new FormData();
+            form.append('session_id', sessionId);
+            form.append('finalize', 'true');
+
+            const response = await fetch('/asr/audiostream', {
+                method: 'POST',
+                body: form
+            });
+
+            if (!response.ok) {
+                let errorText = `HTTP ${response.status} from server`;
+                try {
+                    const data = await response.json();
+                    if (data && data.error) errorText = data.error;
+                } catch (_) {}
+                throw new Error(errorText);
+            }
+
+            const data = await response.json();
+            return data;
+        }
+
+        function handleTranscriptUpdate(data) {
+            const transcript = data && data.transcript ? data.transcript : null;
+            if (!transcript) return;
+
+            if (transcript.error) {
+                console.warn('ASR chunk skipped:', transcript.error);
+            }
+
+            if (typeof transcript.applied_through_index === 'number') {
+                if (transcript.applied_through_index < lastAppliedAsrIndex) return;
+                lastAppliedAsrIndex = transcript.applied_through_index;
+            }
+
+            if (!transcript.updated) return;
+            const delta = typeof transcript.delta === 'string' ? transcript.delta.trim() : '';
+            if (!delta) return;
+
+            const current = (userInput.value || '').trim();
+            const nextValue = current ? `${current} ${delta}` : delta;
+            writeUserInputFromAsr(nextValue);
+        }
+
+        function queueAudioUpload(blob, chunkMeta) {
             micUploadChain = micUploadChain
-                .then(() => uploadAudioChunk(blob))
+                .then(() => uploadAudioChunk(blob, chunkMeta))
+                .then((data) => {
+                    handleTranscriptUpdate(data);
+                })
                 .catch((err) => {
                     console.error('Mic upload error:', err);
                 });
+        }
+
+        function queueAsrFinalize(sessionId) {
+            if (!sessionId) return;
+
+            micUploadChain = micUploadChain
+                .then(() => finalizeAsrSession(sessionId))
+                .then((data) => {
+                    handleTranscriptUpdate(data);
+                })
+                .catch((err) => {
+                    console.error('ASR finalize error:', err);
+                });
+        }
+
+        function clearMicRecorderRestartTimer() {
+            if (micRecorderRestartTimer) {
+                clearTimeout(micRecorderRestartTimer);
+                micRecorderRestartTimer = null;
+            }
+        }
+
+        function scheduleMicRecorderStop() {
+            clearMicRecorderRestartTimer();
+            micRecorderRestartTimer = setTimeout(() => {
+                if (micRecorder && micRecorder.state === 'recording') {
+                    micRecorder.stop();
+                }
+            }, MIC_CHUNK_MS);
+        }
+
+        function startMicRecorderCycle() {
+            if (!micMediaStream) return;
+
+            micRecorder = micRecorderMimeType
+                ? new MediaRecorder(micMediaStream, { mimeType: micRecorderMimeType })
+                : new MediaRecorder(micMediaStream);
+
+            micRecorder.ondataavailable = (event) => {
+                if (!event.data || event.data.size === 0) return;
+                const chunkMeta = {
+                    sessionId: asrSessionId,
+                    index: asrChunkIndex,
+                    startedAtMs: Math.max(0, Math.round(performance.now() - asrSessionStartedAt))
+                };
+                asrChunkIndex += 1;
+                queueAudioUpload(event.data, chunkMeta);
+            };
+
+            micRecorder.onerror = (event) => {
+                console.error('Mic recorder error:', event);
+            };
+
+            micRecorder.onstop = () => {
+                clearMicRecorderRestartTimer();
+
+                if (!isMicStreaming) {
+                    if (micMediaStream) {
+                        micMediaStream.getTracks().forEach(t => t.stop());
+                    }
+                    micMediaStream = null;
+                    micRecorder = null;
+
+                    if (pendingAsrFinalizeSessionId) {
+                        const finalSessionId = pendingAsrFinalizeSessionId;
+                        pendingAsrFinalizeSessionId = null;
+                        queueAsrFinalize(finalSessionId);
+                    }
+                    return;
+                }
+
+                startMicRecorderCycle();
+            };
+
+            micRecorder.start();
+            scheduleMicRecorderStop();
         }
 
         async function startMicStreaming() {
@@ -313,41 +471,26 @@
             }
 
             micMediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            startFreshAsrSession();
+            pendingAsrFinalizeSessionId = null;
 
             const preferredMimeTypes = [
                 'audio/webm;codecs=opus',
                 'audio/webm'
             ];
-            const selectedMimeType = preferredMimeTypes.find(t => MediaRecorder.isTypeSupported(t));
-            micRecorder = selectedMimeType ? new MediaRecorder(micMediaStream, { mimeType: selectedMimeType }) : new MediaRecorder(micMediaStream);
-
-            micRecorder.ondataavailable = (event) => {
-                if (!event.data) return;
-                queueAudioUpload(event.data);
-            };
-
-            micRecorder.onerror = (event) => {
-                console.error('Mic recorder error:', event);
-            };
-
-            micRecorder.onstop = () => {
-                if (micMediaStream) {
-                    micMediaStream.getTracks().forEach(t => t.stop());
-                }
-                micMediaStream = null;
-                micRecorder = null;
-            };
+            micRecorderMimeType = preferredMimeTypes.find(t => MediaRecorder.isTypeSupported(t)) || null;
 
             isMicStreaming = true;
             setListeningState(true);
 
-            // Start recording and emit chunks periodically (live feed)
-            micRecorder.start(1000);
+            startMicRecorderCycle();
         }
 
         function stopMicStreaming() {
             isMicStreaming = false;
             setListeningState(false);
+            pendingAsrFinalizeSessionId = asrSessionId;
+            clearMicRecorderRestartTimer();
 
             try {
                 if (micRecorder && micRecorder.state !== 'inactive') {
@@ -357,10 +500,18 @@
                 console.error('Failed to stop mic recorder:', err);
             }
 
-            if (micMediaStream) {
-                micMediaStream.getTracks().forEach(t => t.stop());
-                micMediaStream = null;
+            if ((!micRecorder || micRecorder.state === 'inactive') && pendingAsrFinalizeSessionId) {
+                if (micMediaStream) {
+                    micMediaStream.getTracks().forEach(t => t.stop());
+                    micMediaStream = null;
+                }
+                const finalSessionId = pendingAsrFinalizeSessionId;
+                pendingAsrFinalizeSessionId = null;
+                queueAsrFinalize(finalSessionId);
             }
+
+            micRecorderMimeType = null;
+            asrSessionId = null;
         }
 
         async function toggleMicStreaming() {
@@ -392,7 +543,7 @@
             const useLLM = document.getElementById('llm-toggle').checked;
             
             appendMessage('User', text);
-            userInput.value = '';
+            writeUserInputFromAsr('');
 
             try {
                 const response = await fetch('/chat', {
