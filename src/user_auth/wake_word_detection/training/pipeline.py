@@ -140,7 +140,7 @@ def run_pipeline():
 
     print("7. Save model.\n")
 
-    save_path = base_dir / "models" / f"run_{int(time.time())}"
+    save_path = base_dir.parent / "models" / f"run_{int(time.time())}"
     save_path.mkdir(parents=True, exist_ok=True)
 
     model.save(save_path / "model.keras")
