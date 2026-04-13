@@ -15,7 +15,7 @@ pip install -r requirements.txt
 train the models and create its weights:
 ```
 nlu/intent_detection/training/pipeline
-nlu/wake_word_detection/training/pipeline
+user_auth/wake_word_detection/training/pipeline
 ```
 
 ## Run the App
