@@ -5,7 +5,7 @@ from pathlib import Path
 from src.nlu.intent_detection.inference import VoiceAssistantNLU
 from src.generation.answer_generator import AnswerGenerator
 from src.fulfillment.dispatcher import FulfillmentDispatcher
-from src.user_auth import asr
+from src.user_auth import asr, wake_word
 from config import load_env_file
 
 load_env_file()
@@ -97,9 +97,36 @@ def tts_audio():
     )
 
 
+@app.route('/wwd/audiostream', methods=['POST'])
+def process_wwd_audio():
+    audio_file = request.files.get('audio')
+    session_id = (request.form.get('session_id') or 'default').strip() or 'default'
+    chunk_index_raw = request.form.get('chunk_index')
+    chunk_started_at_ms_raw = request.form.get('chunk_started_at_ms')
+
+    chunk_index = int(chunk_index_raw) if chunk_index_raw not in (None, "") else None
+    chunk_started_at_ms = float(chunk_started_at_ms_raw) if chunk_started_at_ms_raw not in (None, "") else None
+
+    if audio_file is None:
+        return jsonify({"error": "Missing audio file"}), 400
+
+    chunk_bytes = audio_file.read() or b""
+    if not chunk_bytes:
+        return jsonify({"error": "Empty audio chunk"}), 400
+
+    wwd_result = wake_word.ingest_audio_chunk(
+        chunk_bytes=chunk_bytes,
+        mimetype=audio_file.mimetype,
+        session_id=session_id,
+        chunk_index=chunk_index,
+        chunk_started_at_ms=chunk_started_at_ms,
+    )
+
+    return jsonify({"ok": True, "wwd_result": wwd_result})
+
 @app.route('/asr/audiostream', methods=['POST'])
 @app.route('/verification/audiostream', methods=['POST'])
-def microphone_audio():
+def process_asr_audio():
     audio_file = request.files.get('audio')
     session_id = (request.form.get('session_id') or 'default').strip() or 'default'
     finalize = str(request.form.get('finalize', '')).strip().lower() in {"1", "true", "yes"}

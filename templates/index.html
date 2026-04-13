@@ -472,9 +472,28 @@
             writeUserInputFromAsr(nextValue);
         }
 
+        function handleWakeWordResponse(data) {
+            const wwd_result = data && data.wwd_result ? data.wwd_result : null;
+            if (!wwd_result) return;
+
+            if (wwd_result.error) {
+                console.warn('WWD chunk skipped:', wwd_result.error);
+                return;
+            }
+
+            if (!wwd_result.ww_detected) return;
+
+            if (typeof wwd_result.score === "number") console.log(wwd_result.score)
+
+            appendMessage('Atlas', 'I am awake. How can I assist you?');
+            enterMode("asr");
+        }
+
         function handleAudioResponse(data) {
             if (currentMode === "asr") {
                 handleTranscriptUpdate(data);
+            } else if (currentMode === "wwd") {
+                handleWakeWordResponse(data);
             }
         }
 
@@ -519,17 +538,13 @@
         }
 
         function buildChunkMetaForCurrentMode() {
-            if (currentMode === "asr") {
-                const chunkMeta = {
-                    sessionId: currentSessionId,
-                    index: currentChunkIndex,
-                    startedAtMs: Math.max(0, Math.round(performance.now() - currentSessionStartedAt))
-                };
-                currentChunkIndex += 1;
-                return chunkMeta;
-            }
-
-            return {};
+            const chunkMeta = {
+                sessionId: currentSessionId,
+                index: currentChunkIndex,
+                startedAtMs: Math.max(0, Math.round(performance.now() - currentSessionStartedAt))
+            };
+            currentChunkIndex += 1;
+            return chunkMeta;
         }
 
         function startMicRecorderCycle() {
