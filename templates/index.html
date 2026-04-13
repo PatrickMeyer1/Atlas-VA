@@ -52,13 +52,33 @@
     <div class="w-2/3 flex flex-col gap-4">
         
         <div class="flex gap-4 h-16">
-            <div id="lock-status" class="flex-1 rounded-xl flex items-center justify-center font-bold text-lg shadow-md bg-red-600 text-white transition-colors duration-300">
+            <div id="lock-status" class="flex-1 rounded-xl flex items-center justify-center font-bold text-lg shadow-md bg-red-600 text-white transition-colors duration-300" onclick="setIsUnlocked(true)">
                 <i data-feather="lock" class="w-5 h-5 mr-2"></i>
                 <span>System Locked</span>
             </div>
-            <div id="listen-status" class="flex-1 rounded-xl flex items-center justify-center font-bold text-lg shadow-md bg-yellow-500 text-gray-900 transition-colors duration-300 cursor-pointer hover:opacity-90" onclick="toggleMicStreaming()">
+            <div id="listen-status" class="flex-1 rounded-xl flex items-center justify-center font-bold text-lg shadow-md bg-yellow-500 text-gray-900 transition-colors duration-300">
                 <i data-feather="mic-off" class="w-5 h-5 mr-2"></i>
                 <span>Not Listening</span>
+            </div>
+        </div>
+
+        <div class="flex gap-4 h-16">
+            <div id="start-enrol" class="flex-1 rounded-xl flex items-center justify-center font-bold text-lg shadow-md bg-blue-600 hover:bg-blue-500 text-white transition-colors duration-300 cursor-pointer">
+                <i data-feather="user-plus" class="w-5 h-5 mr-2"></i>
+                <span>Start Enrol</span>
+            </div>
+            <div id="atlas-status" class="flex-1 rounded-xl flex items-center justify-center font-bold text-lg shadow-md bg-teal-600 hover:bg-teal-500 text-white transition-colors duration-300 cursor-pointer" onclick="toggleAtlas()">
+                <i data-feather="power" class="w-5 h-5 mr-2"></i>
+                <span>Start Atlas</span>
+            </div>
+        </div>
+
+        <div class="flex gap-4 h-10">
+            <div id="bypass-verification" class="flex-1 rounded-xl flex items-center justify-center font-bold text-base shadow-md bg-gray-600 hover:bg-gray-500 text-white transition-colors duration-300 cursor-pointer" onclick="bypassVerification()">
+                <span>Bypass Verification</span>
+            </div>
+            <div id="bypass-wakeword" class="flex-1 rounded-xl flex items-center justify-center font-bold text-base shadow-md bg-gray-600 hover:bg-gray-500 text-white transition-colors duration-300 cursor-pointer" onclick="bypassWakeWord()">
+                <span>Bypass Wake Word</span>
             </div>
         </div>
 
@@ -103,7 +123,9 @@
         const userInput = document.getElementById('user-input');
         const gameRender = document.getElementById('game-render');
         const noRenderText = document.getElementById('no-render-text');
+        const lockStatusDiv = document.getElementById('lock-status');
         const listenStatusDiv = document.getElementById('listen-status');
+        const atlasStatusDiv = document.getElementById('atlas-status');
         const ttsToggleBtn = document.getElementById('tts-toggle-btn');
         
         let activeTimers = [];
@@ -115,14 +137,17 @@
         let micRecorder = null;
         let micUploadChain = Promise.resolve();
         let currentTtsAudio = null;
-        let asrSessionId = null;
-        let asrChunkIndex = 0;
-        let asrSessionStartedAt = 0;
+        let currentSessionId = null;
+        let currentChunkIndex = 0;
+        let currentSessionStartedAt = 0;
         let lastAppliedAsrIndex = -1;
         let pendingAsrFinalizeSessionId = null;
         let micRecorderMimeType = null;
         let micRecorderRestartTimer = null;
-        const MIC_CHUNK_MS = 3000;
+        let isUnlocked = false; // identifies if the user has verified for the session (only needs to happen once)
+        let currentMode = "none"; // Values: "none", "enrol", "verification", "wwd", "asr"
+        let listeningMode = "none"; // Values: "none", "enrol", "verification", "wwd", "asr"
+        const MIC_CHUNK_MS = 500;
 
         // Allow Enter key to send
         userInput.addEventListener("keypress", function(event) {
@@ -135,35 +160,99 @@
             }
         }
 
-        function createAsrSessionId() {
+        function createSessionId() {
             return (window.crypto && typeof window.crypto.randomUUID === 'function')
                 ? window.crypto.randomUUID()
-                : `asr-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+                : `session-${Date.now()}-${Math.random().toString(16).slice(2)}`;
         }
 
         function writeUserInputFromAsr(text) {
             userInput.value = text;
         }
 
-        function startFreshAsrSession() {
-            asrSessionId = createAsrSessionId();
-            asrChunkIndex = 0;
-            asrSessionStartedAt = performance.now();
-            lastAppliedAsrIndex = -1;
+        function startFreshSession() {
+            currentSessionId = createSessionId();
+            currentChunkIndex = 0;
+            currentSessionStartedAt = performance.now();
         }
 
-        function setListeningState(streaming) {
-            if (!listenStatusDiv) return;
+        function setLockState(unlocked) {
+            if (!lockStatusDiv) return;
 
-            if (streaming) {
-                listenStatusDiv.className = "flex-1 rounded-xl flex items-center justify-center font-bold text-lg shadow-md bg-green-500 text-white transition-colors duration-300 cursor-pointer hover:opacity-90";
-                listenStatusDiv.innerHTML = '<i data-feather="mic" class="w-5 h-5 mr-2"></i><span>Listening...</span>';
+            if (unlocked) {
+                lockStatusDiv.className = "flex-1 rounded-xl flex items-center justify-center font-bold text-lg shadow-md bg-green-600 text-white transition-colors duration-300";
+                lockStatusDiv.innerHTML = '<i data-feather="unlock" class="w-5 h-5 mr-2"></i><span>System Unlocked</span>';
             } else {
-                listenStatusDiv.className = "flex-1 rounded-xl flex items-center justify-center font-bold text-lg shadow-md bg-yellow-500 text-gray-900 transition-colors duration-300 cursor-pointer hover:opacity-90";
+                lockStatusDiv.className = "flex-1 rounded-xl flex items-center justify-center font-bold text-lg shadow-md bg-red-600 text-white transition-colors duration-300";
+                lockStatusDiv.innerHTML = '<i data-feather="lock" class="w-5 h-5 mr-2"></i><span>System Locked</span>';
+            }
+
+            renderFeatherIcons();
+        }
+
+        function setAtlasState(currentMode) {
+            if (!atlasStatusDiv) return;
+
+            if (["verification", "wwd", "asr"].includes(currentMode)) {
+                atlasStatusDiv.className = "flex-1 rounded-xl flex items-center justify-center font-bold text-lg shadow-md bg-red-600 hover:bg-red-500 text-white transition-colors duration-300 cursor-pointer";
+                atlasStatusDiv.innerHTML = '<i data-feather="power" class="w-5 h-5 mr-2"></i><span>Stop Atlas</span>';
+                
+            } else {
+                atlasStatusDiv.className = "flex-1 rounded-xl flex items-center justify-center font-bold text-lg shadow-md bg-teal-600 hover:bg-teal-500 text-white transition-colors duration-300 cursor-pointer";
+                atlasStatusDiv.innerHTML = '<i data-feather="power" class="w-5 h-5 mr-2"></i><span>Start Atlas</span>';
+            }
+
+            renderFeatherIcons();
+        }
+
+        function setListeningState(listeningMode) {
+            if (!listenStatusDiv) return;
+            
+            if (listeningMode === "enrol") {
+                listenStatusDiv.className = "flex-1 rounded-xl flex items-center justify-center font-bold text-lg shadow-md bg-green-500 text-white transition-colors duration-300";
+                listenStatusDiv.innerHTML = '<i data-feather="mic" class="w-5 h-5 mr-2"></i><span>Listening for enrolment.</span>';
+            } else if (listeningMode === "verification") {
+                listenStatusDiv.className = "flex-1 rounded-xl flex items-center justify-center font-bold text-lg shadow-md bg-green-500 text-white transition-colors duration-300";
+                listenStatusDiv.innerHTML = '<i data-feather="mic" class="w-5 h-5 mr-2"></i><span>Listening for verification.</span>';
+            } else if (listeningMode === "wwd") {
+                listenStatusDiv.className = "flex-1 rounded-xl flex items-center justify-center font-bold text-lg shadow-md bg-green-500 text-white transition-colors duration-300";
+                listenStatusDiv.innerHTML = '<i data-feather="mic" class="w-5 h-5 mr-2"></i><span>Listening for wake word.</span>';
+            } else if (listeningMode === "asr") {
+                listenStatusDiv.className = "flex-1 rounded-xl flex items-center justify-center font-bold text-lg shadow-md bg-green-500 text-white transition-colors duration-300";
+                listenStatusDiv.innerHTML = '<i data-feather="mic" class="w-5 h-5 mr-2"></i><span>Listening for intents.</span>';
+            } else {
+                listenStatusDiv.className = "flex-1 rounded-xl flex items-center justify-center font-bold text-lg shadow-md bg-yellow-500 text-gray-900 transition-colors duration-300";
                 listenStatusDiv.innerHTML = '<i data-feather="mic-off" class="w-5 h-5 mr-2"></i><span>Not Listening</span>';
             }
 
             renderFeatherIcons();
+        }
+
+        function refreshUI() {
+            setLockState(isUnlocked)
+            setAtlasState(currentMode)
+            setListeningState(listeningMode)
+        }
+
+        function setIsUnlocked(newUnlockedState) {
+            if (typeof newUnlockedState === "boolean") {
+                isUnlocked = newUnlockedState;
+                refreshUI();
+            }
+        }
+
+        function setMode(mode) {
+            if (["none", "enrol", "verification", "wwd", "asr"].includes(mode)){
+                currentMode = mode;
+                refreshUI();
+            }
+        }
+
+        function setListeningMode(mode) {
+            if (["none", "enrol", "verification", "wwd", "asr"].includes(mode)){
+                listeningMode = mode;
+                refreshUI();
+            }
         }
 
         function setTtsButtonState(enabled) {
@@ -296,19 +385,29 @@
             } catch (_) {}
         }
 
+        function getAudioEndpointForCurrentMode() {
+            if (currentMode === "asr") return "/asr/audiostream";
+            if (currentMode === "verification") return "/verification/audiostream";
+            if (currentMode === "wwd") return "/wwd/audiostream";
+            return null;
+        }
+
         async function uploadAudioChunk(blob, chunkMeta) {
             if (!blob || blob.size === 0) return;
+
+            const endpoint = getAudioEndpointForCurrentMode();
+            if (!endpoint) return;
 
             const form = new FormData();
             form.append('audio', blob, 'chunk.webm');
             const sessionId = (chunkMeta && typeof chunkMeta.sessionId === 'string' && chunkMeta.sessionId)
                 ? chunkMeta.sessionId
-                : asrSessionId;
+                : currentSessionId;
             if (sessionId) form.append('session_id', sessionId);
             if (chunkMeta && Number.isInteger(chunkMeta.index)) form.append('chunk_index', String(chunkMeta.index));
             if (chunkMeta && typeof chunkMeta.startedAtMs === 'number') form.append('chunk_started_at_ms', String(chunkMeta.startedAtMs));
 
-            const response = await fetch('/asr/audiostream', {
+            const response = await fetch(endpoint, {
                 method: 'POST',
                 body: form
             });
@@ -373,11 +472,36 @@
             writeUserInputFromAsr(nextValue);
         }
 
+        function handleWakeWordResponse(data) {
+            const wwd_result = data && data.wwd_result ? data.wwd_result : null;
+            if (!wwd_result) return;
+
+            if (wwd_result.error) {
+                console.warn('WWD chunk skipped:', wwd_result.error);
+                return;
+            }
+
+            if (!wwd_result.ww_detected) return;
+
+            if (typeof wwd_result.score === "number") console.log(wwd_result.score)
+
+            appendMessage('Atlas', 'I am awake. How can I assist you?');
+            enterMode("asr");
+        }
+
+        function handleAudioResponse(data) {
+            if (currentMode === "asr") {
+                handleTranscriptUpdate(data);
+            } else if (currentMode === "wwd") {
+                handleWakeWordResponse(data);
+            }
+        }
+
         function queueAudioUpload(blob, chunkMeta) {
             micUploadChain = micUploadChain
                 .then(() => uploadAudioChunk(blob, chunkMeta))
                 .then((data) => {
-                    handleTranscriptUpdate(data);
+                    handleAudioResponse(data);
                 })
                 .catch((err) => {
                     console.error('Mic upload error:', err);
@@ -413,6 +537,16 @@
             }, MIC_CHUNK_MS);
         }
 
+        function buildChunkMetaForCurrentMode() {
+            const chunkMeta = {
+                sessionId: currentSessionId,
+                index: currentChunkIndex,
+                startedAtMs: Math.max(0, Math.round(performance.now() - currentSessionStartedAt))
+            };
+            currentChunkIndex += 1;
+            return chunkMeta;
+        }
+
         function startMicRecorderCycle() {
             if (!micMediaStream) return;
 
@@ -422,12 +556,7 @@
 
             micRecorder.ondataavailable = (event) => {
                 if (!event.data || event.data.size === 0) return;
-                const chunkMeta = {
-                    sessionId: asrSessionId,
-                    index: asrChunkIndex,
-                    startedAtMs: Math.max(0, Math.round(performance.now() - asrSessionStartedAt))
-                };
-                asrChunkIndex += 1;
+                const chunkMeta = buildChunkMetaForCurrentMode();
                 queueAudioUpload(event.data, chunkMeta);
             };
 
@@ -471,27 +600,33 @@
             }
 
             micMediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            startFreshAsrSession();
-            pendingAsrFinalizeSessionId = null;
 
             const preferredMimeTypes = [
                 'audio/webm;codecs=opus',
                 'audio/webm'
             ];
             micRecorderMimeType = preferredMimeTypes.find(t => MediaRecorder.isTypeSupported(t)) || null;
-
             isMicStreaming = true;
-            setListeningState(true);
 
             startMicRecorderCycle();
         }
 
         function stopMicStreaming() {
             isMicStreaming = false;
-            setListeningState(false);
-            pendingAsrFinalizeSessionId = asrSessionId;
+
+            const modeBeingStopped = currentMode;
+
+            setMode("none");
+            setListeningMode("none");
             clearMicRecorderRestartTimer();
 
+            if (modeBeingStopped === "asr"){
+                pendingAsrFinalizeSessionId = currentSessionId;
+                currentSessionId = null;
+            } else {
+                pendingAsrFinalizeSessionId = null;
+            }
+            
             try {
                 if (micRecorder && micRecorder.state !== 'inactive') {
                     micRecorder.stop();
@@ -511,7 +646,6 @@
             }
 
             micRecorderMimeType = null;
-            asrSessionId = null;
         }
 
         async function toggleMicStreaming() {
@@ -525,6 +659,53 @@
                 appendMessage('System', `Error: ${err.message}`);
                 stopMicStreaming();
             }
+        }
+
+        function enterMode(mode) {
+            setMode(mode);
+            setListeningMode(mode);
+
+            if (["verification", "wwd", "asr"].includes(mode)) {
+                startFreshSession();
+            }
+
+            if (mode === "asr"){
+                pendingAsrFinalizeSessionId = null;
+                lastAppliedAsrIndex = -1;
+            }
+        }
+
+        async function bypassVerification() {
+            setIsUnlocked(true)
+            enterMode("wwd")
+
+            if (!isMicStreaming) {
+                await toggleMicStreaming();
+            }
+        }
+
+        async function bypassWakeWord() {
+            if (!isUnlocked) return;
+            enterMode("asr")
+
+            if (!isMicStreaming) {
+                await toggleMicStreaming();
+            }
+        }
+
+        async function toggleAtlas() {
+            if (isMicStreaming) {
+                await toggleMicStreaming();
+                return;
+            }
+
+            if (!isUnlocked) {
+                enterMode("verification");
+            } else {
+                enterMode("wwd");
+            }
+
+            await toggleMicStreaming();
         }
 
         function appendMessage(sender, text) {
@@ -651,7 +832,9 @@
         setInterval(renderTimerUI, 1000);
 
         renderFeatherIcons();
-        setListeningState(false);
+        setIsUnlocked(false);
+        setMode("none");
+        setListeningMode("none");
         setTtsButtonState(ttsEnabled);
         loadInitialUiState();
     </script>

@@ -12,9 +12,10 @@ pip install -r requirements.txt
 
 ## Training
 
-train the model and create its weights:
+train the models and create its weights:
 ```
 nlu/intent_detection/training/pipeline
+nlu/wake_word_detection/training/pipeline
 ```
 
 ## Run the App
