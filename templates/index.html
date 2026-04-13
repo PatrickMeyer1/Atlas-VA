@@ -67,17 +67,17 @@
                 <i data-feather="user-plus" class="w-5 h-5 mr-2"></i>
                 <span>Start Enrol</span>
             </div>
-            <div id="atlas-status" class="flex-1 rounded-xl flex items-center justify-center font-bold text-lg shadow-md bg-teal-600 hover:bg-teal-500 text-white transition-colors duration-300 cursor-pointer" onclick="startAtlas()">
+            <div id="atlas-status" class="flex-1 rounded-xl flex items-center justify-center font-bold text-lg shadow-md bg-teal-600 hover:bg-teal-500 text-white transition-colors duration-300 cursor-pointer" onclick="toggleAtlas()">
                 <i data-feather="power" class="w-5 h-5 mr-2"></i>
                 <span>Start Atlas</span>
             </div>
         </div>
 
         <div class="flex gap-4 h-10">
-            <div id="bypass-verification" class="flex-1 rounded-xl flex items-center justify-center font-bold text-base shadow-md bg-gray-600 hover:bg-gray-500 text-white transition-colors duration-300 cursor-pointer">
+            <div id="bypass-verification" class="flex-1 rounded-xl flex items-center justify-center font-bold text-base shadow-md bg-gray-600 hover:bg-gray-500 text-white transition-colors duration-300 cursor-pointer" onclick="bypassVerification()">
                 <span>Bypass Verification</span>
             </div>
-            <div id="bypass-wakeword" class="flex-1 rounded-xl flex items-center justify-center font-bold text-base shadow-md bg-gray-600 hover:bg-gray-500 text-white transition-colors duration-300 cursor-pointer">
+            <div id="bypass-wakeword" class="flex-1 rounded-xl flex items-center justify-center font-bold text-base shadow-md bg-gray-600 hover:bg-gray-500 text-white transition-colors duration-300 cursor-pointer" onclick="bypassWakeWord()">
                 <span>Bypass Wake Word</span>
             </div>
         </div>
@@ -207,10 +207,19 @@
 
         function setListeningState(listeningMode) {
             if (!listenStatusDiv) return;
-
-            if (["enrol", "verification", "wwd", "asr"].includes(listeningMode)) {
+            
+            if (listeningMode === "enrol") {
                 listenStatusDiv.className = "flex-1 rounded-xl flex items-center justify-center font-bold text-lg shadow-md bg-green-500 text-white transition-colors duration-300";
-                listenStatusDiv.innerHTML = '<i data-feather="mic" class="w-5 h-5 mr-2"></i><span>Listening...</span>';
+                listenStatusDiv.innerHTML = '<i data-feather="mic" class="w-5 h-5 mr-2"></i><span>Listening for enrolment.</span>';
+            } else if (listeningMode === "verification") {
+                listenStatusDiv.className = "flex-1 rounded-xl flex items-center justify-center font-bold text-lg shadow-md bg-green-500 text-white transition-colors duration-300";
+                listenStatusDiv.innerHTML = '<i data-feather="mic" class="w-5 h-5 mr-2"></i><span>Listening for verification.</span>';
+            } else if (listeningMode === "wwd") {
+                listenStatusDiv.className = "flex-1 rounded-xl flex items-center justify-center font-bold text-lg shadow-md bg-green-500 text-white transition-colors duration-300";
+                listenStatusDiv.innerHTML = '<i data-feather="mic" class="w-5 h-5 mr-2"></i><span>Listening for wake word.</span>';
+            } else if (listeningMode === "asr") {
+                listenStatusDiv.className = "flex-1 rounded-xl flex items-center justify-center font-bold text-lg shadow-md bg-green-500 text-white transition-colors duration-300";
+                listenStatusDiv.innerHTML = '<i data-feather="mic" class="w-5 h-5 mr-2"></i><span>Listening for intents.</span>';
             } else {
                 listenStatusDiv.className = "flex-1 rounded-xl flex items-center justify-center font-bold text-lg shadow-md bg-yellow-500 text-gray-900 transition-colors duration-300";
                 listenStatusDiv.innerHTML = '<i data-feather="mic-off" class="w-5 h-5 mr-2"></i><span>Not Listening</span>';
@@ -641,22 +650,45 @@
             setMode(mode);
             setListeningMode(mode);
 
-            if (mode === "asr") {
+            if (["verification", "wwd", "asr"].includes(mode)) {
                 startFreshSession();
+            }
+
+            if (mode === "asr"){
                 pendingAsrFinalizeSessionId = null;
                 lastAppliedAsrIndex = -1;
             }
         }
 
-        async function startAtlas() {
-            // if (!isUnlocked) {
-            //     setMode("verification");
-            //     setListeningMode("verification");
-            // } else {
-            //     setMode("wwd");
-            //     setListeningMode("wwd");
-            // }
-            enterMode("asr");
+        async function bypassVerification() {
+            setIsUnlocked(true)
+            enterMode("wwd")
+
+            if (!isMicStreaming) {
+                await toggleMicStreaming();
+            }
+        }
+
+        async function bypassWakeWord() {
+            if (!isUnlocked) return;
+            enterMode("asr")
+
+            if (!isMicStreaming) {
+                await toggleMicStreaming();
+            }
+        }
+
+        async function toggleAtlas() {
+            if (isMicStreaming) {
+                await toggleMicStreaming();
+                return;
+            }
+
+            if (!isUnlocked) {
+                enterMode("verification");
+            } else {
+                enterMode("wwd");
+            }
 
             await toggleMicStreaming();
         }
