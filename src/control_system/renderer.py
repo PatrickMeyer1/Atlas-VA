@@ -27,7 +27,7 @@ class Renderer:
             f"Tool: {state['inventory']['tool'].value.capitalize() if state['inventory']['tool'] else 'None'}"
         )
 
-        ax.text(6, -0.25, inventory_text, ha="center", va="bottom")
+        ax.text(6, -0.5, inventory_text, fontsize=18, ha="center", va="bottom")
         
         # Add station text
 
@@ -35,7 +35,7 @@ class Renderer:
             x=STATION_X - 0.3,
             y=RESOURCE_TILE_Y + 0.5,
             s="Resource\n Station",
-            fontsize=10,
+            fontsize=15,
             ha='right',
             va='center'
         )
@@ -44,7 +44,7 @@ class Renderer:
             x=STATION_X - 0.3,
             y=TOOL_TILE_Y + 0.5,
             s="Tool\n Station",
-            fontsize=10,
+            fontsize=15,
             ha='right',
             va='center'
         )

@@ -1,6 +1,7 @@
 from flask import Flask, Response, jsonify, render_template, request, send_file, stream_with_context
 import os
 import glob
+import json
 from pathlib import Path
 from src.nlu.intent_detection.inference import VoiceAssistantNLU
 from src.generation.answer_generator import AnswerGenerator
@@ -42,8 +43,16 @@ def chat():
     if "tts_enabled" in req_payload:
         ui_state["tts_enabled"] = bool(req_payload.get("tts_enabled"))
 
-    # NLU
-    intent_result = nlu.process_utterance(user_text)
+    # check for bypass to go directly to fulfillment
+    if user_text.startswith("/bypass:"):
+        try:
+            raw_dict = user_text[len("/bypass:"):].strip()
+            intent_result = json.loads(raw_dict)
+        except json.JSONDecodeError:
+            return jsonify({"error": "Invalid JSON in bypass intent"}), 400
+    else:
+        # NLU
+        intent_result = nlu.process_utterance(user_text)
 
     # Fulfillment
     fulfillment_result = dispatcher.dispatch(intent_result)
@@ -123,6 +132,8 @@ def process_wwd_audio():
     )
 
     return jsonify({"ok": True, "wwd_result": wwd_result})
+
+### DO THESE NEED TO BE TWO SEPARATE FUNCTIONS (process_wwd_audio and process_asr_audio)? CAN THEY BE COMBINED INTO ONE WITH A PARAMETER TO DISTINGUISH? ###
 
 @app.route('/asr/audiostream', methods=['POST'])
 @app.route('/verification/audiostream', methods=['POST'])
