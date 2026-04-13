@@ -16,7 +16,7 @@ def load_audio(file_path):
     return torch.from_numpy(y).float().unsqueeze(0), sr
 
 def compute_embedding_nemo(file_path, speaker_model):
-    embedding = speaker_model.get_embedding(file_path)
+    embedding = speaker_model.get_embedding(str(file_path))
     return np.array(embedding.squeeze().cpu().tolist())
 
 def compute_embedding_ecapa(file_path, classifier):
@@ -25,8 +25,8 @@ def compute_embedding_ecapa(file_path, classifier):
     if sr == TARGET_SR:
         # Compute embedding
         with torch.no_grad():
-            embeddings1 = classifier.encode_batch(signal)
-        return np.array(embeddings1.squeeze().cpu().tolist())
+            embedding = classifier.encode_batch(signal)
+        return np.array(embedding.squeeze().cpu().tolist())
 
     return None
 

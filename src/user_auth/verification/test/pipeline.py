@@ -14,7 +14,7 @@ def run_pipeline(names, model_type):
     ## STEP 1: Preprocess audio files into .wav
     ############################################
     # Flag to skip preprocessing
-    SKIP = False
+    SKIP = True
 
     print("1. Preprocess audio files into .wav\n")
 
@@ -47,7 +47,7 @@ def run_pipeline(names, model_type):
             file_path = preprocessed_recordings_path / filename
             evaluate_embeddings(name, file_path, recording_dir, classifier, model_type)
             print()
-    else:
+    elif model_type == "NEMO":
         import nemo.collections.asr as nemo_asr
         speaker_model = nemo_asr.models.EncDecSpeakerLabelModel.from_pretrained("nvidia/speakerverification_en_titanet_large")
 
@@ -58,5 +58,7 @@ def run_pipeline(names, model_type):
             file_path = preprocessed_recordings_path / filename
             evaluate_embeddings(name, file_path, recording_dir, speaker_model, model_type)
             print()
+    else:
+        print("No valid model type selected")
 
 run_pipeline(["Patrick", "Palmer", "Rosenblatt"], "NEMO")

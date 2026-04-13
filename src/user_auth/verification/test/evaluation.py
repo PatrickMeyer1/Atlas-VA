@@ -40,8 +40,11 @@ def create_confusion_matrix(name, y_test, y_pred):
 def evaluate_embeddings(name, reference_file_path, recording_dir, classifier, model_type, show_speaker_only=False):
     if model_type == "ECAPA":
         reference_embedding = compute_embedding_ecapa(reference_file_path, classifier)
-    else:
+    elif model_type == "NEMO":
         reference_embedding = compute_embedding_nemo(reference_file_path, classifier)
+    else:
+        print("Invalid model type.")
+        return
     if reference_embedding is None:
         print("Failed to compute reference embedding.")
         return
