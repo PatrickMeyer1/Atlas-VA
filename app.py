@@ -6,7 +6,8 @@ from pathlib import Path
 from src.nlu.intent_detection.inference import VoiceAssistantNLU
 from src.generation.answer_generator import AnswerGenerator
 from src.fulfillment.dispatcher import FulfillmentDispatcher
-from src.user_auth import asr, wake_word
+from src.user_auth import asr
+from src.user_auth.wake_word_detection import wake_word
 from config import load_env_file
 
 load_env_file()
