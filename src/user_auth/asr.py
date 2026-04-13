@@ -22,7 +22,7 @@ _MODEL_CACHE_DIR = Path(__file__).resolve().parents[2] / ".cache" / "whisper"
 _SESSIONS: dict[str, "AsrSession"] = {}
 
 _SESSION_TTL_SECONDS = 120.0
-_MIN_SPEECH_SECONDS = 1.2
+_MIN_SPEECH_SECONDS = 0.6
 _MAX_BUFFER_SECONDS = 6.0
 _SILENCE_RMS_THRESHOLD = 0.01
 
