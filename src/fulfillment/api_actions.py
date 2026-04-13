@@ -118,7 +118,7 @@ class APIFulfillment:
                 if not raw_sun:
                     return {"intent": intent, "success": False, "error_code": "no_sunlight_information"}
                                 
-                clean_sun = [self.NL_MAPPING["sunlight"].get(i.lower(), "") for i in raw_sun] # map to array
+                clean_sun = [self.NL_MAPPING["sunlight"].get(i.lower(), i.lower().strip()) for i in raw_sun] # map to array
 
                 return {"intent": intent, "success": True, "data": {"plant": official_name, "sunlight": clean_sun}}
             case "get_plant_watering_care":
@@ -129,7 +129,7 @@ class APIFulfillment:
                 
                 raw_water_care = raw_water_care.lower()
 
-                frequency = self.NL_MAPPING["watering"].get(raw_water_care, "")
+                frequency = self.NL_MAPPING["watering"].get(raw_water_care, raw_water_care)
                 benchmark = details.get("watering_general_benchmark", None)
                 
                 if not benchmark or not benchmark.get("value") or not benchmark.get("unit"):

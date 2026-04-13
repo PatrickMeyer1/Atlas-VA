@@ -19,14 +19,66 @@
         <div class="p-4 border-b border-gray-700 bg-gray-800 rounded-t-xl flex items-center justify-between">
             <h2 class="text-xl font-bold text-blue-400">Atlas Communication</h2>
 
-            <button type="button" id="tts-toggle-btn" onclick="toggleTts()" class="text-blue-400 hover:text-blue-300 rounded p-1 focus:outline-none focus:ring-2 focus:ring-blue-500" title="Toggle speech" aria-label="Toggle speech">
-                <i data-feather="volume-2" class="w-5 h-5"></i>
-            </button>
+            <div class="flex items-center gap-2">
+                <button type="button" id="help-toggle-btn" onclick="toggleHelp()" class="text-gray-400 hover:text-white rounded p-1 focus:outline-none focus:ring-2 focus:ring-blue-500" title="Help commands" aria-label="Help commands">
+                    <i data-feather="help-circle" class="w-5 h-5"></i>
+                </button>
+                
+                <button type="button" id="tts-toggle-btn" onclick="toggleTts()" class="text-blue-400 hover:text-blue-300 rounded p-1 focus:outline-none focus:ring-2 focus:ring-blue-500" title="Toggle speech" aria-label="Toggle speech">
+                    <i data-feather="volume-2" class="w-5 h-5"></i>
+                </button>
+            </div>
         </div>
-        
-        <div id="chat-history" class="flex-1 overflow-y-auto p-4 space-y-4">
-            <div class="bg-blue-900/30 border border-blue-800 p-3 rounded-lg text-sm text-blue-200">
-                System initialized. Waiting for input...
+
+        <div class="flex-1 relative overflow-hidden">
+            
+            <div id="help-menu" 
+                class="hidden opacity-0 -translate-y-4 transition-all duration-300 ease-in-out absolute top-0 left-0 w-full h-3/4 z-50 bg-gray-900 border-b border-gray-700 p-6 overflow-y-auto">
+
+                <div class="space-y-8 text-base">
+                    <section>
+                        <h4 class="text-blue-300 font-bold mb-4 uppercase text-sm tracking-widest border-l-4 border-blue-500 pl-3">Basic Interaction</h4>
+                        <ul class="text-gray-200 space-y-4">
+                            <li>• <strong>Greetings:</strong> Say hello to Atlas.</li>
+                            <li>• <strong>Goodbye:</strong> Let Atlas know when you are finished.</li>
+                            <li>• <strong>Out-Of-Scope:</strong> Used when a request falls outside Atlas's current abilities.</li>
+                            <li>• <strong>Timer:</strong> "Set a [Duration] timer." You can also say "Set a [TimerName] timer for [Duration]".</li>
+                            <li>• <strong>Weather:</strong> "What's the weather in [City]?" You can also specify a [Country].</li>
+                        </ul>
+                    </section>
+
+                    <section>
+                        <h4 class="text-green-400 font-bold mb-4 uppercase text-sm tracking-widest border-l-4 border-green-500 pl-3">Plant Knowledge</h4>
+                        <ul class="text-gray-200 space-y-4">
+                            <li>• <strong>Sunlight:</strong> "How much sun does a [PlantName] need?".</li>
+                            <li>• <strong>Watering Care:</strong> "Get watering information for [PlantName]".</li>
+                            <li>• <strong>Plant Cycle:</strong> "What is the cycle for [PlantName]?" (e.g., Perennial).</li>
+                            <li>• <strong>Edibility:</strong> "Is [PlantName] edible?".</li>
+                            <li>• <strong>Search by Environment:</strong> "Find [Quantity] [indoor/outdoor] plants".</li>
+                        </ul>
+                    </section>
+
+                    <section>
+                        <h4 class="text-yellow-500 font-bold mb-4 uppercase text-sm tracking-widest border-l-4 border-yellow-500 pl-3">Garden Control System</h4>
+                        <ul class="text-gray-200 space-y-4">
+                            <li>• <strong>Move:</strong> "Move [Direction]" (left, right, up, down). Optionally add "[NumTiles]".</li>
+                            <li>• <strong>Pick Up Tool:</strong> "Pick up the [Tool]" (watering can or hoe).</li>
+                            <li>• <strong>Pick Up Seed:</strong> "Pick up [Seed] seeds" (carrot, lettuce, or tomato).</li>
+                            <li>• <strong>Plant:</strong> "Plant [Seed]" (carrot, lettuce, or tomato).</li>
+                            <li>• <strong>Water:</strong> "Water the current tile".</li>
+                            <li>• <strong>Till:</strong> "Till the current tile".</li>
+                            <li>• <strong>Fill Water:</strong> "Fill my watering can at the Resource Station".</li>
+                            <li>• <strong>Restart:</strong> "Restart the game" to reset the state.</li>
+                            <li>• <strong>Game Help:</strong> "Get game instructions" for help with the control system.</li>
+                        </ul>
+                    </section>
+                </div>
+            </div>
+            
+            <div id="chat-history" class="h-full overflow-y-auto p-4 space-y-4">
+                <div class="bg-blue-900/30 border border-blue-800 p-3 rounded-lg text-sm text-blue-200">
+                    System initialized. Waiting for input...
+                </div>
             </div>
         </div>
 
@@ -50,64 +102,61 @@
     </div>
 
     <div class="w-2/3 flex flex-col gap-4">
-        
-        <div class="flex gap-4 h-16">
-            <div id="lock-status" class="flex-1 rounded-xl flex items-center justify-center font-bold text-lg shadow-md bg-red-600 text-white transition-colors duration-300" onclick="setIsUnlocked(true)">
-                <i data-feather="lock" class="w-5 h-5 mr-2"></i>
-                <span>System Locked</span>
+        <div class="flex flex-col gap-2"> 
+            <div class="flex gap-4 h-12">
+                <div id="lock-status" class="flex-1 rounded-xl flex items-center justify-center font-bold text-lg shadow-md bg-red-600 text-white transition-colors duration-300" onclick="setIsUnlocked(true)">
+                    <i data-feather="lock" class="w-4 h-4 mr-2"></i>
+                    <span>System Locked</span>
+                </div>
+                <div id="listen-status" class="flex-1 rounded-xl flex items-center justify-center font-bold text-lg shadow-md bg-yellow-500 text-gray-900 transition-colors duration-300">
+                    <i data-feather="mic-off" class="w-4 h-4 mr-2"></i>
+                    <span>Not Listening</span>
+                </div>
             </div>
-            <div id="listen-status" class="flex-1 rounded-xl flex items-center justify-center font-bold text-lg shadow-md bg-yellow-500 text-gray-900 transition-colors duration-300">
-                <i data-feather="mic-off" class="w-5 h-5 mr-2"></i>
-                <span>Not Listening</span>
-            </div>
-        </div>
 
-        <div class="flex gap-4 h-16">
-            <div id="start-enrol" class="flex-1 rounded-xl flex items-center justify-center font-bold text-lg shadow-md bg-blue-600 hover:bg-blue-500 text-white transition-colors duration-300 cursor-pointer">
-                <i data-feather="user-plus" class="w-5 h-5 mr-2"></i>
-                <span>Start Enrol</span>
+            <div class="flex gap-4 h-12">
+                <div id="start-enrol" class="flex-1 rounded-xl flex items-center justify-center font-bold text-lg shadow-md bg-blue-600 hover:bg-blue-500 text-white transition-colors duration-300 cursor-pointer">
+                    <i data-feather="user-plus" class="w-4 h-4 mr-2"></i>
+                    <span>Start Enrol</span>
+                </div>
+                <div id="atlas-status" class="flex-1 rounded-xl flex items-center justify-center font-bold text-lg shadow-md bg-teal-600 hover:bg-teal-500 text-white transition-colors duration-300 cursor-pointer" onclick="toggleAtlas()">
+                    <i data-feather="power" class="w-4 h-4 mr-2"></i>
+                    <span>Start Atlas</span>
+                </div>
             </div>
-            <div id="atlas-status" class="flex-1 rounded-xl flex items-center justify-center font-bold text-lg shadow-md bg-teal-600 hover:bg-teal-500 text-white transition-colors duration-300 cursor-pointer" onclick="toggleAtlas()">
-                <i data-feather="power" class="w-5 h-5 mr-2"></i>
-                <span>Start Atlas</span>
-            </div>
-        </div>
 
-        <div class="flex gap-4 h-10">
-            <div id="bypass-verification" class="flex-1 rounded-xl flex items-center justify-center font-bold text-base shadow-md bg-gray-600 hover:bg-gray-500 text-white transition-colors duration-300 cursor-pointer" onclick="bypassVerification()">
-                <span>Bypass Verification</span>
-            </div>
-            <div id="bypass-wakeword" class="flex-1 rounded-xl flex items-center justify-center font-bold text-base shadow-md bg-gray-600 hover:bg-gray-500 text-white transition-colors duration-300 cursor-pointer" onclick="bypassWakeWord()">
-                <span>Bypass Wake Word</span>
+            <div class="flex gap-4 h-8">
+                <div id="bypass-verification" class="flex-1 rounded-xl flex items-center justify-center font-bold text-xs uppercase tracking-widest shadow-md bg-gray-600 hover:bg-gray-500 text-white transition-colors duration-300 cursor-pointer" onclick="bypassVerification()">
+                    <span>Bypass Verification</span>
+                </div>
+                <div id="bypass-wakeword" class="flex-1 rounded-xl flex items-center justify-center font-bold text-xs uppercase tracking-widest shadow-md bg-gray-600 hover:bg-gray-500 text-white transition-colors duration-300 cursor-pointer" onclick="bypassWakeWord()">
+                    <span>Bypass Wake Word</span>
+                </div>
             </div>
         </div>
 
         <div class="h-64 bg-gray-800 rounded-xl shadow-lg border border-gray-700 p-4 flex gap-4">
-            <div id="weather-box" class="flex-1 bg-gray-700/50 rounded flex flex-col items-center justify-evenly border border-gray-600 p-4 transition-all duration-700">
-                <h3 class="text-xs font-bold text-gray-500 uppercase tracking-[0.2em]">Environment Status</h3>
-                
-                <i id="weather-icon" data-feather="cloud" class="w-20 h-20 transition-colors duration-700"></i>
-                
-                <div class="text-center">
-                    <span id="weather-desc" class="block text-gray-100 text-2xl font-black uppercase leading-none">
-                        Open-Meteo API
-                    </span>
-                    
-                    <span id="weather-location" class="block text-gray-400 text-sm font-bold uppercase tracking-widest mt-2">
-                        Waiting for data
-                    </span>
+            <div id="weather-box" class="flex-1 bg-gray-700/50 rounded flex flex-col items-center border border-gray-600 p-4 transition-all duration-700">
+                <h3 class="w-full text-xs font-bold text-gray-400 uppercase tracking-widest border-b border-gray-600 pb-2 mb-4 text-center">Environment Status</h3>
+
+                <div class="flex flex-col items-center justify-center flex-1">
+                    <i id="weather-icon" data-feather="cloud" class="w-20 h-20 transition-colors duration-700 mb-4"></i>
+                    <div class="text-center">
+                        <span id="weather-desc" class="block text-gray-100 text-2xl font-black capitalize leading-none">Open-Meteo API</span>
+                        <span id="weather-location" class="block text-gray-400 text-sm font-bold capitalize tracking-widest mt-2">Waiting for data</span>
+                    </div>
                 </div>
             </div>
             
             <div id="timer-display" class="flex-1 bg-gray-700/50 rounded p-4 border border-gray-600 flex flex-col">
-                <h3 class="text-sm font-bold text-blue-400 mb-2 border-b border-gray-600 pb-1">Active Timers</h3>
-                <div id="timer-list" class="flex-1 overflow-y-auto text-base text-gray-200">
+                <h3 class="w-full text-xs font-bold text-gray-400 uppercase tracking-widest border-b border-gray-600 pb-2 mb-4 text-center">Active Timers</h3>
+                <div id="timer-list" class="flex-1 overflow-y-auto text-base text-gray-200 pr-2">
                     No active timers.
                 </div>
             </div>
         </div>
 
-        <div class="flex-1 bg-gray-800 rounded-xl shadow-lg border border-gray-700 p-4 flex flex-col min-h-0">
+        <div class="flex-1 min-h-[300px] bg-gray-800 rounded-xl shadow-lg border border-gray-700 p-4 flex flex-col min-h-0">
             <div class="flex justify-between items-center mb-2">
                 <h2 class="text-lg font-bold text-green-400 tracking-tighter">Garden Control System</h2>
             </div>
@@ -127,6 +176,7 @@
         const listenStatusDiv = document.getElementById('listen-status');
         const atlasStatusDiv = document.getElementById('atlas-status');
         const ttsToggleBtn = document.getElementById('tts-toggle-btn');
+        const helpMenu = document.getElementById('help-menu');
         
         let activeTimers = [];
 
@@ -195,11 +245,8 @@
 
             if (["verification", "wwd", "asr"].includes(currentMode)) {
                 atlasStatusDiv.className = "flex-1 rounded-xl flex items-center justify-center font-bold text-lg shadow-md bg-red-600 hover:bg-red-500 text-white transition-colors duration-300 cursor-pointer";
-                atlasStatusDiv.innerHTML = '<i data-feather="power" class="w-5 h-5 mr-2"></i><span>Stop Atlas</span>';
-                
             } else {
                 atlasStatusDiv.className = "flex-1 rounded-xl flex items-center justify-center font-bold text-lg shadow-md bg-teal-600 hover:bg-teal-500 text-white transition-colors duration-300 cursor-pointer";
-                atlasStatusDiv.innerHTML = '<i data-feather="power" class="w-5 h-5 mr-2"></i><span>Start Atlas</span>';
             }
 
             renderFeatherIcons();
@@ -210,16 +257,16 @@
             
             if (listeningMode === "enrol") {
                 listenStatusDiv.className = "flex-1 rounded-xl flex items-center justify-center font-bold text-lg shadow-md bg-green-500 text-white transition-colors duration-300";
-                listenStatusDiv.innerHTML = '<i data-feather="mic" class="w-5 h-5 mr-2"></i><span>Listening for enrolment.</span>';
+                listenStatusDiv.innerHTML = '<i data-feather="mic" class="w-5 h-5 mr-2"></i><span>Listening for enrolment...</span>';
             } else if (listeningMode === "verification") {
                 listenStatusDiv.className = "flex-1 rounded-xl flex items-center justify-center font-bold text-lg shadow-md bg-green-500 text-white transition-colors duration-300";
-                listenStatusDiv.innerHTML = '<i data-feather="mic" class="w-5 h-5 mr-2"></i><span>Listening for verification.</span>';
+                listenStatusDiv.innerHTML = '<i data-feather="mic" class="w-5 h-5 mr-2"></i><span>Listening for verification...</span>';
             } else if (listeningMode === "wwd") {
                 listenStatusDiv.className = "flex-1 rounded-xl flex items-center justify-center font-bold text-lg shadow-md bg-green-500 text-white transition-colors duration-300";
-                listenStatusDiv.innerHTML = '<i data-feather="mic" class="w-5 h-5 mr-2"></i><span>Listening for wake word.</span>';
+                listenStatusDiv.innerHTML = '<i data-feather="mic" class="w-5 h-5 mr-2"></i><span>Listening for wake word...</span>';
             } else if (listeningMode === "asr") {
                 listenStatusDiv.className = "flex-1 rounded-xl flex items-center justify-center font-bold text-lg shadow-md bg-green-500 text-white transition-colors duration-300";
-                listenStatusDiv.innerHTML = '<i data-feather="mic" class="w-5 h-5 mr-2"></i><span>Listening for intents.</span>';
+                listenStatusDiv.innerHTML = '<i data-feather="mic" class="w-5 h-5 mr-2"></i><span>Listening for intents...</span>';
             } else {
                 listenStatusDiv.className = "flex-1 rounded-xl flex items-center justify-center font-bold text-lg shadow-md bg-yellow-500 text-gray-900 transition-colors duration-300";
                 listenStatusDiv.innerHTML = '<i data-feather="mic-off" class="w-5 h-5 mr-2"></i><span>Not Listening</span>';
@@ -706,6 +753,24 @@
             }
 
             await toggleMicStreaming();
+        }
+
+        function toggleHelp() {
+            const isHidden = helpMenu.classList.contains('hidden');
+
+            if (isHidden) {
+                helpMenu.classList.remove('hidden');
+                setTimeout(() => {
+                    helpMenu.classList.remove('opacity-0', '-translate-y-4');
+                    helpMenu.classList.add('opacity-100', 'translate-y-0');
+                }, 10);
+            } else {
+                helpMenu.classList.remove('opacity-100', 'translate-y-0');
+                helpMenu.classList.add('opacity-0', '-translate-y-4');
+                setTimeout(() => {
+                    helpMenu.classList.add('hidden');
+                }, 300);
+            }
         }
 
         function appendMessage(sender, text) {
