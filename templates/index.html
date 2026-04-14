@@ -373,6 +373,12 @@
             }
         }
 
+        function speakText(text) {
+            const normalizedText = text.trim();
+            if (!normalizedText) return;
+            speakTts({ text: normalizedText }, normalizedText);
+        }
+
         async function loadInitialUiState() {
             try {
                 const response = await fetch('/state');
@@ -486,6 +492,7 @@
             if (!wwd_result.ww_detected) return;
 
             appendMessage('Atlas', 'I am awake. How can I assist you?');
+            speakText('I am awake. How can I assist you?');
             enterMode("asr");
         }
 
@@ -508,6 +515,7 @@
                     : "user";
 
             appendMessage('Atlas', `Welcome ${verifiedName}, you have been verified.`);
+            speakText(`Welcome ${verifiedName}, you have been verified.`);
             setIsUnlocked(true);
             enterMode("wwd");
         }
