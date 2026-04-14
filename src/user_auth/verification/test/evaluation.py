@@ -48,6 +48,7 @@ def evaluate_embeddings(name, reference_file_path, recording_dir, classifier, mo
     if reference_embedding is None:
         print("Failed to compute reference embedding.")
         return
+    print(reference_embedding)
 
     results = []
     for label in ["positive", "near", "other"]:

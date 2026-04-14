@@ -61,4 +61,4 @@ def run_pipeline(names, model_type):
     else:
         print("No valid model type selected")
 
-run_pipeline(["Patrick", "Palmer", "Rosenblatt"], "NEMO")
+run_pipeline(["Patrick", "Palmer", "Rosenblatt"], "ECAPA")

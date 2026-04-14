@@ -7,6 +7,7 @@ from src.generation.answer_generator import AnswerGenerator
 from src.fulfillment.dispatcher import FulfillmentDispatcher
 from src.user_auth import asr
 from src.user_auth.wake_word_detection import wake_word
+from src.user_auth.verification import verification
 from config import load_env_file
 
 load_env_file()
@@ -98,6 +99,33 @@ def tts_audio():
     )
 
 
+@app.route('/verification/audiostream', methods=['POST'])
+def process_verification_audio():
+    audio_file = request.files.get('audio')
+    session_id = (request.form.get('session_id') or 'default').strip() or 'default'
+    chunk_index_raw = request.form.get('chunk_index')
+    chunk_started_at_ms_raw = request.form.get('chunk_started_at_ms')
+
+    chunk_index = int(chunk_index_raw) if chunk_index_raw not in (None, "") else None
+    chunk_started_at_ms = float(chunk_started_at_ms_raw) if chunk_started_at_ms_raw not in (None, "") else None
+
+    if audio_file is None:
+        return jsonify({"error": "Missing audio file"}), 400
+
+    chunk_bytes = audio_file.read() or b""
+    if not chunk_bytes:
+        return jsonify({"error": "Empty audio chunk"}), 400
+
+    verification_result = verification.ingest_audio_chunk(
+        chunk_bytes=chunk_bytes,
+        mimetype=audio_file.mimetype,
+        session_id=session_id,
+        chunk_index=chunk_index,
+        chunk_started_at_ms=chunk_started_at_ms,
+    )
+
+    return jsonify({"ok": True, "verification_result": verification_result})
+
 @app.route('/wwd/audiostream', methods=['POST'])
 def process_wwd_audio():
     audio_file = request.files.get('audio')
@@ -126,7 +154,6 @@ def process_wwd_audio():
     return jsonify({"ok": True, "wwd_result": wwd_result})
 
 @app.route('/asr/audiostream', methods=['POST'])
-@app.route('/verification/audiostream', methods=['POST'])
 def process_asr_audio():
     audio_file = request.files.get('audio')
     session_id = (request.form.get('session_id') or 'default').strip() or 'default'
@@ -177,5 +204,5 @@ def get_state():
     return jsonify(ui_state)
 
 if __name__ == "__main__":
-    app.run(host='0.0.0.0', port=5001)
+    app.run(host="0.0.0.0", port=5001, debug=True, use_reloader=False)
 
