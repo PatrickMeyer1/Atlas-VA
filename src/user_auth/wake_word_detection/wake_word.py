@@ -11,7 +11,8 @@ from typing import Optional
 import imageio_ffmpeg
 import numpy as np
 from tensorflow import keras
-import librosa
+import torch
+import torchaudio
 
 _SAMPLE_RATE = 16000
 _DURATION = 2.5
@@ -182,14 +183,32 @@ def extract_mfcc(audio: np.ndarray, sr: int = 16000, window_sec: float = 0.025, 
     n_fft = int(window_sec * sr)       # window length in samples
     hop_length = int(hop_sec * sr)     # hop length in samples
 
-    mfcc = librosa.feature.mfcc(
-        y=audio,
-        sr=sr,
+    # Match the MFCC settings used during training (previously via librosa.feature.mfcc).
+    transform = torchaudio.transforms.MFCC(
+        sample_rate=sr,
         n_mfcc=n_mfcc,
-        n_fft=n_fft,
-        hop_length=hop_length
+        dct_type=2,
+        norm="ortho",
+        log_mels=False,
+        melkwargs={
+            "n_fft": n_fft,
+            "win_length": n_fft,
+            "hop_length": hop_length,
+            "window_fn": torch.hann_window,
+            "n_mels": 128,
+            "center": True,
+            "pad_mode": "constant",
+            "power": 2.0,
+            "norm": "slaney",
+            "mel_scale": "slaney",
+        },
     )
-    return mfcc
+
+    waveform = torch.as_tensor(audio, dtype=torch.float32)
+    with torch.inference_mode():
+        mfcc = transform(waveform)
+
+    return mfcc.detach().cpu().numpy().astype(np.float32, copy=False)
 
 
 def _detect_wake_word(audio: np.ndarray) -> tuple[bool, float]:

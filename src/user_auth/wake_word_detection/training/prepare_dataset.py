@@ -1,6 +1,8 @@
 import librosa
 import os
 import numpy as np
+import torch
+import torchaudio
 
 def label_dataset(processed_dir):
     y_labels = []
@@ -47,14 +49,32 @@ def extract_mfcc(file_path, sr=16000, window_sec=0.025, hop_sec=0.010, n_mfcc=13
     n_fft = int(window_sec * sr)       # window length in samples
     hop_length = int(hop_sec * sr)     # hop length in samples
 
-    mfcc = librosa.feature.mfcc(
-        y=y,
-        sr=sr,
+    # Match the MFCC settings used during training (previously via librosa.feature.mfcc).
+    transform = torchaudio.transforms.MFCC(
+        sample_rate=sr,
         n_mfcc=n_mfcc,
-        n_fft=n_fft,
-        hop_length=hop_length
+        dct_type=2,
+        norm="ortho",
+        log_mels=False,
+        melkwargs={
+            "n_fft": n_fft,
+            "win_length": n_fft,
+            "hop_length": hop_length,
+            "window_fn": torch.hann_window,
+            "n_mels": 128,
+            "center": True,
+            "pad_mode": "constant",
+            "power": 2.0,
+            "norm": "slaney",
+            "mel_scale": "slaney",
+        },
     )
-    return mfcc
+
+    waveform = torch.as_tensor(y, dtype=torch.float32)
+    with torch.inference_mode():
+        mfcc = transform(waveform)
+
+    return mfcc.detach().cpu().numpy().astype(np.float32, copy=False)
 
 def extract_train_features(file_paths):
     X = []
