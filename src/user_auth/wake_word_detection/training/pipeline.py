@@ -1,5 +1,6 @@
 from pathlib import Path
 import os
+import numpy as np
 from sklearn.model_selection import train_test_split
 import time
 
@@ -88,8 +89,10 @@ def run_pipeline():
 
     print("4. Augment dataset and extract features\n")
 
-    print("Augment training data and extract training features: ")
-    X_train = extract_train_features(X_train_files) # TODO - actually handle augmentation
+    print("Augment training data and extract training features: ") 
+    train_augments = ["volume", "time", "bg_noise"] # volume, time, bg_noise
+    X_train = extract_train_features(X_train_files, train_augments)
+    y_train_augmented = np.repeat(y_train, 1 + len(train_augments))
     print()
 
     print("Extract validation features: ")
@@ -109,7 +112,7 @@ def run_pipeline():
 
     print("5. Training model.\n")
 
-    model = train_model(X_train, X_validation, y_train, y_validation) # TODO: parameterize, early stopping, dropout, etc.
+    model = train_model(X_train, X_validation, y_train_augmented, y_validation, 1) # TODO: parameterize, early stopping, dropout, etc.
 
     print("Model training complete.")
     print()
@@ -127,8 +130,8 @@ def run_pipeline():
     report_metrics(y_test, y_pred, y_pred_prob, "test")
     print()
 
-    create_confusion_matrix(y_test, y_pred)
-    print()
+    # create_confusion_matrix(y_test, y_pred)
+    # print()
 
     show_misclassifications(y_test, y_pred, y_pred_prob, X_test_files)
 

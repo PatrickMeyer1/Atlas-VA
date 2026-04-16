@@ -4,6 +4,8 @@ import numpy as np
 import torch
 import torchaudio
 
+from augmentation import volume_scale, time_shift, add_noise
+
 def label_dataset(processed_dir):
     y_labels = []
     file_paths = []
@@ -34,9 +36,9 @@ def label_dataset(processed_dir):
     return file_paths, y_labels
 
 # Define the extract_mfcc with default parameters
-def extract_mfcc(file_path, sr=16000, window_sec=0.025, hop_sec=0.010, n_mfcc=13):
+def extract_mfcc(y, sr=16000, window_sec=0.025, hop_sec=0.010, n_mfcc=13):
     """
-    file_path: path to .wav file
+    y: audio time series
     sr: sampling rate
     window_sec: window size in seconds (slice)
     hop_sec: hop size in seconds
@@ -44,7 +46,6 @@ def extract_mfcc(file_path, sr=16000, window_sec=0.025, hop_sec=0.010, n_mfcc=13
     """
 
     # Load audio
-    y, sr = librosa.load(file_path, sr=sr)
 
     n_fft = int(window_sec * sr)       # window length in samples
     hop_length = int(hop_sec * sr)     # hop length in samples
@@ -76,12 +77,33 @@ def extract_mfcc(file_path, sr=16000, window_sec=0.025, hop_sec=0.010, n_mfcc=13
 
     return mfcc.detach().cpu().numpy().astype(np.float32, copy=False)
 
-def extract_train_features(file_paths):
+def extract_train_features(file_paths, augments=None):
     X = []
-
+    if augments is not None or len(augments) > 0:
+        print("Running with augments:", augments)
+        
     for file_path in file_paths:
-        mfcc = extract_mfcc(file_path)
+        y, sr = librosa.load(file_path, sr=16000)
+        mfcc = extract_mfcc(y, sr=sr)
         X.append(mfcc)
+
+        if augments is not None or len(augments) > 0:
+            if "volume" in augments:
+                y_vol_aug = volume_scale(y)
+                mfcc_vol_aug = extract_mfcc(y_vol_aug, sr=sr)
+                X.append(mfcc_vol_aug)
+
+            if "time" in augments:
+                y_time_aug = time_shift(y)
+                mfcc_time_aug = extract_mfcc(y_time_aug, sr=sr)
+                X.append(mfcc_time_aug)
+
+            if "bg_noise" in augments:
+                y_bg_noise_aug = add_noise(y)
+                mfcc_bg_noise_aug = extract_mfcc(y_bg_noise_aug, sr=sr)
+                X.append(mfcc_bg_noise_aug)
+
+    
 
     X = np.array(X)
     print("X shape:", X.shape)
@@ -95,7 +117,8 @@ def extract_validation_test_features(file_paths):
     X = []
 
     for file_path in file_paths:
-        mfcc = extract_mfcc(file_path)
+        y, sr = librosa.load(file_path, sr=16000)
+        mfcc = extract_mfcc(y, sr=sr)
         X.append(mfcc)
 
     X = np.array(X)

@@ -1,3 +1,5 @@
+from xml.parsers.expat import model
+
 import tensorflow as tf
 from tensorflow.keras import layers, models
 import matplotlib.pyplot as plt
@@ -21,9 +23,138 @@ def plot_training_and_validation_loss_and_accuracy(history):
   )
   plt.show()
 
-def train_model(X_train, X_validation, y_train, y_validation):
+def train_model(X_train, X_validation, y_train, y_validation, model_index=0):
     # Initialize the model
-    model = models.Sequential([
+    model = get_model(model_index, X_train)
+    model.summary()
+
+    # Compile the model
+    model.compile(
+        optimizer="adam",
+        loss="binary_crossentropy",
+        metrics=["accuracy"]
+    )
+
+    # Train the model
+    history = model.fit(
+        X_train,
+        y_train,
+        epochs=10,  # We certainly need more epochs with larger dataset
+        batch_size=4,
+        verbose=1,
+        validation_data=(X_validation, y_validation)
+    )
+
+    # plot_training_and_validation_loss_and_accuracy(history)
+
+    return model
+
+
+def get_model(model_index, X_train=None):
+    
+    if model_index == 0:
+        # original model we had
+        return models.Sequential([
+        layers.Input(shape=X_train.shape[1:]),
+
+        layers.Conv2D(32, (5, 3), padding='same'),
+        layers.BatchNormalization(),
+        layers.Activation('relu'),
+        layers.MaxPooling2D((1,2)),
+
+        layers.Conv2D(64, (3, 3), padding='same'),
+        layers.BatchNormalization(),
+        layers.Activation('relu'),
+        layers.MaxPooling2D((1,2)),
+
+        layers.Conv2D(32, (3, 5), padding='same'),
+        layers.BatchNormalization(),
+        layers.Activation('relu'),
+
+        layers.Flatten(),
+        layers.Dense(128),
+        layers.BatchNormalization(),
+        layers.Activation('relu'),
+        layers.Dropout(0.6),
+        layers.Dense(1, activation='sigmoid')
+    ])
+    elif model_index == 1:
+        return models.Sequential([
+        layers.Input(shape=X_train.shape[1:]),
+
+        layers.Conv2D(64, (5, 3), padding='same'),
+        layers.BatchNormalization(),
+        layers.Activation('relu'),
+        layers.MaxPooling2D((1,2)),
+        layers.Conv2D(128, (3, 3), padding='same'),
+        layers.BatchNormalization(),
+        layers.Activation('relu'),
+        layers.MaxPooling2D((1,2)),
+        layers.Conv2D(64, (3, 5), padding='same'),
+        layers.BatchNormalization(),
+        layers.Activation('relu'),
+        layers.Flatten(),
+        layers.Dense(256),
+        layers.BatchNormalization(),
+        layers.Activation('relu'),
+        layers.Dropout(0.5),
+        layers.Dense(1, activation='sigmoid')
+
+    ])
+
+    elif model_index == 2:
+
+        
+        model = models.Sequential([
+       layers.Conv2D(64, (5, 3), padding='same'),
+        layers.BatchNormalization(),
+        layers.Activation('relu'),
+        layers.MaxPooling2D((1,2)),
+
+        layers.Conv2D(128, (3, 3), padding='same'),
+        layers.BatchNormalization(),
+        layers.Activation('relu'),
+        layers.MaxPooling2D((1,2)),
+
+        layers.Conv2D(128, (3, 5), padding='same'),
+        layers.BatchNormalization(),
+        layers.Activation('relu'),
+
+        layers.Flatten(),
+        layers.Dense(256),
+        layers.BatchNormalization(),
+        layers.Activation('relu'),
+        layers.Dropout(0.3),
+        layers.Dense(1, activation='sigmoid')
+    ])
+        
+        return model
+    elif model_index == 3:
+        return models.Sequential([
+        layers.Input(shape=X_train.shape[1:]),
+        layers.Conv2D(64, (5, 3), padding='same'),
+        layers.BatchNormalization(),
+        layers.Activation('relu'),
+        layers.MaxPooling2D((1,2)),
+        layers.Conv2D(128, (5, 5), padding='same'),
+        layers.BatchNormalization(),
+        layers.Activation('relu'),
+        layers.MaxPooling2D((1,2)),
+        layers.Flatten(),
+        layers.Dense(256),
+        layers.BatchNormalization(),
+        layers.Activation('relu'),
+        layers.Dropout(0.5),
+        layers.Dense(128),
+        layers.BatchNormalization(),
+        layers.Activation('relu'),
+        layers.Dropout(0.5),
+        layers.Dense(1, activation='sigmoid')
+    ])
+
+
+    else:
+        return models.Sequential([
         layers.Input(shape=X_train.shape[1:]),
 
         layers.Conv2D(32, (5, 3), padding='same'),
@@ -48,28 +179,7 @@ def train_model(X_train, X_validation, y_train, y_validation):
         layers.Dense(1, activation='sigmoid')
     ])
 
-    model.summary()
 
-    # Compile the model
-    model.compile(
-        optimizer="adam",
-        loss="binary_crossentropy",
-        metrics=["accuracy"]
-    )
-
-    # Train the model
-    history = model.fit(
-        X_train,
-        y_train,
-        epochs=10,  # We certainly need more epochs with larger dataset
-        batch_size=4,
-        verbose=1,
-        validation_data=(X_validation, y_validation)
-    )
-
-    plot_training_and_validation_loss_and_accuracy(history)
-
-    return model
 
 # Reference: Minimally adapted from Brent's CSI4106 A3 (no adaptation required)
 def report_metrics(y_test, y_pred, y_proba, split_name):
