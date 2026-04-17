@@ -1,11 +1,8 @@
-from xml.parsers.expat import model
-
-import tensorflow as tf
-from tensorflow.keras import layers, models
+from tensorflow.keras import layers, models, callbacks
 import matplotlib.pyplot as plt
 import pandas as pd
 from sklearn.metrics import (
-    f1_score, precision_score, recall_score, roc_auc_score, confusion_matrix, ConfusionMatrixDisplay
+    f1_score, precision_score, recall_score, roc_auc_score, accuracy_score, confusion_matrix, ConfusionMatrixDisplay
 )
 from IPython.display import display
 import numpy as np
@@ -35,14 +32,22 @@ def train_model(X_train, X_validation, y_train, y_validation, model_index=0):
         metrics=["accuracy"]
     )
 
+    # Early stopping callback
+    early_stopping_callback = callbacks.EarlyStopping(
+        monitor="val_loss",
+        patience=5,
+        restore_best_weights=True
+    )
+
     # Train the model
     history = model.fit(
         X_train,
         y_train,
-        epochs=10,  # We certainly need more epochs with larger dataset
+        epochs=50,  # We certainly need more epochs with larger dataset
         batch_size=4,
         verbose=1,
-        validation_data=(X_validation, y_validation)
+        validation_data=(X_validation, y_validation),
+        callbacks=[early_stopping_callback]
     )
 
     # plot_training_and_validation_loss_and_accuracy(history)
@@ -103,10 +108,10 @@ def get_model(model_index, X_train=None):
     ])
 
     elif model_index == 2:
-
-        
         model = models.Sequential([
-       layers.Conv2D(64, (5, 3), padding='same'),
+        layers.Input(shape=X_train.shape[1:]),
+
+        layers.Conv2D(64, (5, 3), padding='same'),
         layers.BatchNormalization(),
         layers.Activation('relu'),
         layers.MaxPooling2D((1,2)),
@@ -159,22 +164,22 @@ def get_model(model_index, X_train=None):
 
         layers.Conv2D(32, (5, 3), padding='same'),
         layers.BatchNormalization(),
-        layers.Activation('relu'),
+        layers.Activation('gelu'),
         layers.MaxPooling2D((1,2)),
 
         layers.Conv2D(64, (3, 3), padding='same'),
         layers.BatchNormalization(),
-        layers.Activation('relu'),
+        layers.Activation('gelu'),
         layers.MaxPooling2D((1,2)),
 
         layers.Conv2D(32, (3, 5), padding='same'),
         layers.BatchNormalization(),
-        layers.Activation('relu'),
+        layers.Activation('gelu'),
 
         layers.Flatten(),
         layers.Dense(128),
         layers.BatchNormalization(),
-        layers.Activation('relu'),
+        layers.Activation('gelu'),
         layers.Dropout(0.6),
         layers.Dense(1, activation='sigmoid')
     ])
@@ -185,18 +190,20 @@ def get_model(model_index, X_train=None):
 def report_metrics(y_test, y_pred, y_proba, split_name):
     # Calculate metrics
     metrics_dict = {
-        "Precision": round(precision_score(y_test, y_pred, average="macro"), 2),
-        "Recall": round(recall_score(y_test, y_pred, average="macro"), 2),
-        "F1-Score": round(f1_score(y_test, y_pred, average="macro"), 2),
-        "ROC/AUC": round(roc_auc_score(y_test, y_proba, average="macro"), 2)
+        "Accuracy": round(accuracy_score(y_test, y_pred), 2),
+        "Precision": round(precision_score(y_test, y_pred, pos_label=1, zero_division=0), 2),
+        "Recall": round(recall_score(y_test, y_pred, pos_label=1, zero_division=0), 2),
+        "F1-Score": round(f1_score(y_test, y_pred, pos_label=1, zero_division=0), 2),
+        "ROC/AUC": round(roc_auc_score(y_test, y_proba), 2)
     }
 
     # Store metrics in a DataFrame
     results_df = pd.DataFrame.from_dict([metrics_dict])
 
-    # Print results
+    # Print and return results
     print(f"Metrics for the {split_name.lower()} set: ")
     display(results_df)
+    return metrics_dict
 
 def create_confusion_matrix(y_test, y_pred):
     

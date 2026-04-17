@@ -20,7 +20,7 @@ def label_dataset(processed_dir):
     for label, class_id in label_map.items():
         folder = os.path.join(processed_dir, label)
 
-        for filename in os.listdir(folder):
+        for filename in sorted(os.listdir(folder)):
             if not filename.endswith(".wav"):
                 continue
 
@@ -79,7 +79,7 @@ def extract_mfcc(y, sr=16000, window_sec=0.025, hop_sec=0.010, n_mfcc=13):
 
 def extract_train_features(file_paths, augments=None):
     X = []
-    if augments is not None or len(augments) > 0:
+    if augments is not None and len(augments) > 0:
         print("Running with augments:", augments)
         
     for file_path in file_paths:
@@ -87,7 +87,7 @@ def extract_train_features(file_paths, augments=None):
         mfcc = extract_mfcc(y, sr=sr)
         X.append(mfcc)
 
-        if augments is not None or len(augments) > 0:
+        if augments is not None and len(augments) > 0:
             if "volume" in augments:
                 y_vol_aug = volume_scale(y)
                 mfcc_vol_aug = extract_mfcc(y_vol_aug, sr=sr)
