@@ -1,6 +1,6 @@
 src/control_system/plots/*
 src/nlu/intent_detection/models/bert_finetuned/*
-src/nlu/wake_word_detection/training/models/*
+src/user_auth/wake_word_detection/models/*
 **/__pycache__/
 .DS_Store
 .venv/*

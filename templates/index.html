@@ -104,7 +104,7 @@
     <div class="w-2/3 flex flex-col gap-4">
         <div class="flex flex-col gap-2"> 
             <div class="flex gap-4 h-12">
-                <div id="lock-status" class="flex-1 rounded-xl flex items-center justify-center font-bold text-lg shadow-md bg-red-600 text-white transition-colors duration-300" onclick="setIsUnlocked(true)">
+                <div id="lock-status" class="flex-1 rounded-xl flex items-center justify-center font-bold text-lg shadow-md bg-red-600 text-white transition-colors duration-300">
                     <i data-feather="lock" class="w-4 h-4 mr-2"></i>
                     <span>System Locked</span>
                 </div>
@@ -114,15 +114,14 @@
                 </div>
             </div>
 
-            <div class="flex gap-4 h-12">
-                <div id="start-enrol" class="flex-1 rounded-xl flex items-center justify-center font-bold text-lg shadow-md bg-blue-600 hover:bg-blue-500 text-white transition-colors duration-300 cursor-pointer">
-                    <i data-feather="user-plus" class="w-4 h-4 mr-2"></i>
-                    <span>Start Enrol</span>
-                </div>
-                <div id="atlas-status" class="flex-1 rounded-xl flex items-center justify-center font-bold text-lg shadow-md bg-teal-600 hover:bg-teal-500 text-white transition-colors duration-300 cursor-pointer" onclick="toggleAtlas()">
-                    <i data-feather="power" class="w-4 h-4 mr-2"></i>
-                    <span>Start Atlas</span>
-                </div>
+        <div class="flex gap-4 h-16">
+            <!-- <div id="start-enrol" class="flex-1 rounded-xl flex items-center justify-center font-bold text-lg shadow-md bg-blue-600 hover:bg-blue-500 text-white transition-colors duration-300 cursor-pointer">
+                <i data-feather="user-plus" class="w-5 h-5 mr-2"></i>
+                <span>Start Enrol</span>
+            </div> -->
+            <div id="atlas-status" class="flex-1 rounded-xl flex items-center justify-center font-bold text-lg shadow-md bg-teal-600 hover:bg-teal-500 text-white transition-colors duration-300 cursor-pointer" onclick="toggleAtlas()">
+                <i data-feather="power" class="w-5 h-5 mr-2"></i>
+                <span>Start Atlas</span>
             </div>
 
             <div class="flex gap-4 h-8">
@@ -420,6 +419,12 @@
             }
         }
 
+        function speakText(text) {
+            const normalizedText = text.trim();
+            if (!normalizedText) return;
+            speakTts({ text: normalizedText }, normalizedText);
+        }
+
         async function loadInitialUiState() {
             try {
                 const response = await fetch('/state');
@@ -528,12 +533,37 @@
                 return;
             }
 
+            if (typeof wwd_result.score === "number") console.log(wwd_result.score);
+
             if (!wwd_result.ww_detected) return;
 
-            if (typeof wwd_result.score === "number") console.log(wwd_result.score)
-
             appendMessage('Atlas', 'I am awake. How can I assist you?');
+            speakText('I am awake. How can I assist you?');
             enterMode("asr");
+        }
+
+        function handleVerificationResponse(data) {
+            const verification_result = data && data.verification_result ? data.verification_result : null;
+            if (!verification_result) return;
+
+            if (verification_result.error) {
+                console.warn('Verification chunk skipped:', verification_result.error);
+                return;
+            }
+
+            if (typeof verification_result.score === "number") console.log(verification_result.score);
+
+            if (!verification_result.verified) return;
+
+            const verifiedName =
+                typeof verification_result.name === "string" && verification_result.name.trim()
+                    ? verification_result.name.trim()
+                    : "user";
+
+            appendMessage('Atlas', `Welcome ${verifiedName}, you have been verified.`);
+            speakText(`Welcome ${verifiedName}, you have been verified.`);
+            setIsUnlocked(true);
+            enterMode("wwd");
         }
 
         function handleAudioResponse(data) {
@@ -541,6 +571,8 @@
                 handleTranscriptUpdate(data);
             } else if (currentMode === "wwd") {
                 handleWakeWordResponse(data);
+            } else if (currentMode === "verification") {
+                handleVerificationResponse(data);
             }
         }
 
@@ -666,13 +698,14 @@
             setMode("none");
             setListeningMode("none");
             clearMicRecorderRestartTimer();
-
+            
             if (modeBeingStopped === "asr"){
                 pendingAsrFinalizeSessionId = currentSessionId;
-                currentSessionId = null;
             } else {
                 pendingAsrFinalizeSessionId = null;
             }
+
+            currentSessionId = null;
             
             try {
                 if (micRecorder && micRecorder.state !== 'inactive') {
