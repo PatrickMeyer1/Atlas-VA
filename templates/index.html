@@ -123,7 +123,6 @@
                 <i data-feather="power" class="w-5 h-5 mr-2"></i>
                 <span>Start Atlas</span>
             </div>
-        </div>
 
             <div class="flex gap-4 h-8">
                 <div id="bypass-verification" class="flex-1 rounded-xl flex items-center justify-center font-bold text-xs uppercase tracking-widest shadow-md bg-gray-600 hover:bg-gray-500 text-white transition-colors duration-300 cursor-pointer" onclick="bypassVerification()">
@@ -245,11 +244,8 @@
 
             if (["verification", "wwd", "asr"].includes(currentMode)) {
                 atlasStatusDiv.className = "flex-1 rounded-xl flex items-center justify-center font-bold text-lg shadow-md bg-red-600 hover:bg-red-500 text-white transition-colors duration-300 cursor-pointer";
-                atlasStatusDiv.innerHTML = '<i data-feather="power" class="w-5 h-5 mr-2"></i><span>Stop Atlas</span>';
-                
             } else {
                 atlasStatusDiv.className = "flex-1 rounded-xl flex items-center justify-center font-bold text-lg shadow-md bg-teal-600 hover:bg-teal-500 text-white transition-colors duration-300 cursor-pointer";
-                atlasStatusDiv.innerHTML = '<i data-feather="power" class="w-5 h-5 mr-2"></i><span>Start Atlas</span>';
             }
 
             renderFeatherIcons();
