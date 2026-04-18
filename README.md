@@ -23,6 +23,8 @@ nlu/intent_detection/training/pipeline
 user_auth/wake_word_detection/training/pipeline
 ```
 
+Run using ```python pipeline.py```.
+
 ## Run the App
 
 ```
