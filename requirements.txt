@@ -114,7 +114,7 @@ msgpack==1.1.2
 multidict==6.7.1
 multiprocess==0.70.19
 namex==0.1.0
-nemo-toolkit==2.7.2
+# nemo-toolkit==2.7.2
 networkx==3.6.1
 num2words==0.5.14
 numba==0.65.0
@@ -141,7 +141,6 @@ pooch==1.9.0
 portalocker==3.2.0
 prompt_toolkit==3.0.52
 propcache==0.4.1
-protobuf==5.29.6
 psutil==7.2.2
 pure_eval==0.2.3
 pyannote-core==6.0.1
@@ -207,11 +206,8 @@ tiktoken==0.12.0
 tokenizers==0.22.2
 toml==0.10.2
 toolz==1.1.0
-torch==2.11.0+cu128
-torchaudio==2.11.0+cu128
 torchcodec==0.11.0
 torchmetrics==1.9.0
-torchvision==0.26.0+cu128
 tqdm==4.67.3
 traitlets==5.14.3
 transformers==4.57.6
